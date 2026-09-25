@@ -196,7 +196,10 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       <div data-lpage="align">
         <div class="sect">
           <div class="lbl">Вид отображения</div>
-          <button class="mini wide" id="flipBoard">Перевернуть плату (F)</button>
+          <div class="row">
+            <button class="mini" id="flipBoard" style="flex:1">Перевернуть плату (F)</button>
+            <button class="mini" id="xrayBtn" title="рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы">XRAY</button>
+          </div>
           <div class="row"><span class="lbl" style="flex:none">Вид</span>
             <button class="mini" id="vrotL" style="flex:1" title="повернуть вид на 90° влево (Shift+R)">↺ 90°</button>
             <button class="mini" id="vrotR" style="flex:1" title="повернуть вид на 90° вправо (R)">↻ 90°</button>
@@ -409,7 +412,9 @@ const vp=$('vp'), stack=$('stack'), handle=$('handle'), marks=$('marks'), defs=$
 let layers=[];                 /* index 0 = bottom */
 let view={x:0,y:0,z:1,rot:0,fh:false,fv:false}, sel=null, refId=null, viewMode='all', swipe=.5;
 let inverted=false, grid=true, tintMode='color', labels=true, blinkOn=true;
-let clickMode='none', pending=null, warpInfo='', boardSide='top';
+let clickMode='none', pending=null, warpInfo='', boardSide='top', xray=false;
+/* xray — boardSide не скрывает слои другой стороны */
+const onSide=l=>xray||l.side==='any'||l.side===boardSide;
 let nets=[], points=[], activeNet=null, hlNet=null, selPoint=null, netSeq=1;
 const PKG={ '0201':{L:0.60,W:0.30,T:0.15}, '0402':{L:1.00,W:0.50,T:0.25},
             '0603':{L:1.60,W:0.80,T:0.35}, '0805':{L:2.00,W:1.25,T:0.40} };
@@ -570,7 +575,7 @@ function fitTransform(src,dst,opt){
 /* ---------- render ---------- */
 function effOpacity(l){
   if(!l.on) return 0;
-  if(l.side!=='any' && l.side!==boardSide) return 0;
+  if(!onSide(l)) return 0;
   if(viewMode==='solo') return l.id===sel? l.op : 0;
   if(viewMode==='swipe') return (l.id===sel||l.id===refId)? l.op : 0;
   return l.op;
@@ -888,7 +893,7 @@ function renderCards(){
     const i=idx(l.id);
     const card=document.createElement('div');
     card.className='layer'+(l.id===sel?' sel':'')+
-      ((l.on && (l.side==='any'||l.side===boardSide))?'':' off');
+      ((l.on && onSide(l))?'':' off');
     const head=document.createElement('div'); head.className='lhead';
     const pick=e=>{ if(/INPUT|BUTTON|SELECT|OPTION/.test(e.target.tagName))return;
       sel=l.id; if(refId===sel) refId=(layers.find(x=>x.id!==sel)||l).id;
@@ -1104,6 +1109,7 @@ function sync(){
   $('layerCount').value=String(layers.length);
   if(document.activeElement!==$('imgDir')) $('imgDir').value=imgDir;
   $('flipBoard').textContent='Плата: '+(boardSide==='top'?'TOP':'BOT')+' · перевернуть (F)';
+  $('xrayBtn').classList.toggle('on',xray);
   $('vrotv').textContent=view.rot+'°';
   $('vflipH').classList.toggle('on',!!view.fh); $('vflipV').classList.toggle('on',!!view.fv);
   const rs=$('refSel'); if(rs.value!==refId) rs.value=refId||'';
@@ -1114,7 +1120,7 @@ function sync(){
 /* ---------- persistence ---------- */
 let saveTimer=null;
 function snapshot(){
-  return {v:4, count:layers.length, sel, refId, viewMode, swipe, view, boardSide,
+  return {v:4, count:layers.length, sel, refId, viewMode, swipe, view, boardSide, xray,
     inverted, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.color,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
@@ -1143,7 +1149,7 @@ function restore(s){
   sel=byId(s.sel)?s.sel:layers[layers.length-1].id;
   refId=byId(s.refId)&&s.refId!==sel?s.refId:(layers.find(l=>l.id!==sel)||layers[0]).id;
   viewMode=s.viewMode||'all'; swipe=typeof s.swipe==='number'?s.swipe:.5;
-  boardSide=s.boardSide==='bot'?'bot':'top';
+  boardSide=s.boardSide==='bot'?'bot':'top'; xray=!!s.xray;
   view=Object.assign({x:0,y:0,z:1,rot:0,fh:false,fv:false},s.view||{}); inverted=!!s.inverted; grid=s.grid!==false; labels=s.labels!==false;
   blinkOn=s.blinkOn!==false; tintMode=s.tintMode||'color';
   nets=s.nets||[]; points=s.points||[];
@@ -1349,14 +1355,21 @@ $('moveBtn').onclick=()=>{ clickMode=clickMode==='move'?'none':'move';
 function flipBoard(){
   boardSide = boardSide==='top' ? 'bot' : 'top';
   view.fh=!view.fh;
-  showSide.top = boardSide==='top'; showSide.bot = boardSide==='bot';
-  const vis=layers.filter(l=>l.side==='any'||l.side===boardSide);
+  if(!xray){ showSide.top = boardSide==='top'; showSide.bot = boardSide==='bot'; }
+  const vis=layers.filter(onSide);
   if(vis.length && !vis.some(l=>l.on)) { /* nothing visible on this side — leave as is */ }
   if(!byId(sel)||effOpacity(byId(sel))===0){ const c=vis.find(l=>l.on); if(c)sel=c.id; }
   if(refId===sel){ const o=layers.find(l=>l.id!==sel); if(o)refId=o.id; }
   applyView(); applyAll(); renderCards(); renderComps(); sync(); save();
 }
 $('flipBoard').onclick=flipBoard;
+$('xrayBtn').onclick=()=>{
+  xray=!xray;
+  if(xray){ showSide.top=showSide.bot=true; }
+  else { showSide.top=boardSide==='top'; showSide.bot=boardSide==='bot';
+    if(!byId(sel)||effOpacity(byId(sel))===0){ const c=layers.find(l=>l.on&&onSide(l)); if(c)sel=c.id; } }
+  applyAll(); renderCards(); renderComps(); drawMarks(); sync(); save();
+};
 $('rstView').onclick=()=>fit();
 function rotateView(d){ view.rot=(((view.rot+d)%360)+360)%360; applyView(); sync(); }
 $('vrotL').onclick=()=>rotateView(-90);
