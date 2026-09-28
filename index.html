@@ -727,6 +727,18 @@ function drawComps(){
       poly(g[k], nc?nc.color:'rgba(210,210,210,.55)', hot?nc.color:(isSel?'#fff':col),
            hot?2.4:(isSel?1.6:1), null, hot?1:.85);
     });
+    /* pin numbers — centred on pads, skipped when the part is too small on screen */
+    [['p1','1'],['p2','2']].forEach(([k,num])=>{
+      const q=g[k].map(scr);
+      const pw=Math.min(Math.hypot(q[1].x-q[0].x,q[1].y-q[0].y),Math.hypot(q[2].x-q[1].x,q[2].y-q[1].y));
+      if(pw<5) return;
+      const cx=q.reduce((a,p)=>a+p.x,0)/4, cy=q.reduce((a,p)=>a+p.y,0)/4;
+      const fs=Math.max(9,Math.min(14,pw*.8));
+      const t=svg('text',{x:cx,y:cy,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
+        'font-size':fs,'font-weight':600,'text-anchor':'middle','dominant-baseline':'central',
+        'font-family':'IBM Plex Mono, monospace'});
+      t.textContent=num; marks.appendChild(t);
+    });
     const p=screenOf(g.centre);
     if(isSel){
       const w=Math.max(26,c.des.length*7.6+10);
