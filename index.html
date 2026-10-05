@@ -380,16 +380,21 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
         <div class="sect">
           <div class="lbl">Состояние</div>
           <div class="status" id="saveStatus">Автосохранение включено.</div>
+          <div class="row" id="missRow" hidden>
+            <button class="mini" id="missPick" style="flex:1">Указать файлы…</button>
+            <button class="mini" id="missSkip" style="flex:1">Сохранить без них</button>
+          </div>
           <div class="modes two">
-            <button class="mini" id="exportBtn">Экспорт JSON</button>
-            <button class="mini" id="importBtn">Импорт JSON</button>
+            <button class="mini" id="projSave">Сохранить проект</button>
+            <button class="mini" id="projLoad">Загрузить проект</button>
             <button class="mini" id="saveNow">Сохранить сейчас</button>
             <button class="mini" id="resetAll">Сбросить всё</button>
           </div>
           <div class="keys">
-            «Выбрать файл…» — копия сжимается (webp, до 1600 px)<br>
-            и хранится в браузере; путь записывается как<br>
-            <b>папка картинок + имя файла</b>.<br>
+            <b>Проект *.pcbr</b> — zip без сжатия: project.json<br>
+            (слои, деформация, неты, компоненты, вид) + оригиналы картинок.<br>
+            «Выбрать файл…» — оригинал хранится в браузере (IndexedDB);<br>
+            путь записывается как <b>папка картинок + имя файла</b>.<br>
             «Перечитать файл» — загрузить по пути с диска заново.
           </div>
         </div>
@@ -399,7 +404,8 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 </div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="filterDefs"></defs></svg>
 <input type="file" id="fileImg" accept="image/*" hidden>
-<input type="file" id="fileJson" accept="application/json,.json" hidden>
+<input type="file" id="fileProj" accept=".pcbr,.zip,.json" hidden>
+<input type="file" id="fileMany" accept="image/*" multiple hidden>
 
 <script>
 "use strict";
@@ -425,7 +431,7 @@ let compEditShown=false; /* comp panel rendered for edit mode */
 let compVal={R:'',C:''}; /* last typed value per kind — default for new parts */
 let showSide={top:true,bot:true};
 let calib=null;   /* {size,x,y} while calibrating */
-let browseTarget=null, booted=false, imgDir='pcb_overlay_img/';
+let browseTarget=null, booted=false, imgDir='pcb_overlay_img/', projName='project';
 const dirJoin=(d,n)=>{ d=(d||'').trim().replace(/\\/g,'/'); if(d&&!d.endsWith('/'))d+='/'; return d+n; };
 const byId=id=>layers.find(l=>l.id===id);
 const idx=id=>layers.findIndex(l=>l.id===id);
@@ -450,8 +456,8 @@ function mkLayer(i,init){
   l.clip=clip; l.scene=scene; l.box=box; l.el=img;
   img.addEventListener('load',()=>{ l.ok=true;
     if(img.naturalWidth) l.h=1200*img.naturalHeight/img.naturalWidth;
-    applyLayer(l); checkMissing(); sync(); });
-  img.addEventListener('error',()=>{ l.ok=false; checkMissing(); sync(); });
+    applyLayer(l); checkMissing(); sync(); refreshFiles(); });
+  img.addEventListener('error',()=>{ l.ok=false; checkMissing(); sync(); refreshFiles(); });
   const f=document.createElementNS(SVGNS,'filter');
   f.id='tf_'+id; f.setAttribute('x','0'); f.setAttribute('y','0');
   f.setAttribute('width','100%'); f.setAttribute('height','100%');
@@ -481,7 +487,7 @@ function setCount(n){
     const l=layers.pop();
     points=points.filter(p=>p.layer!==l.id);
     layers.forEach(o=>o.pairs=o.pairs.filter(pr=>pr.rl!==l.id));
-    localStorage.removeItem(IMGKEY(l.id));
+    localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{});
     l.clip.remove(); l.fx.node.remove();
   }
   while(layers.length<n) layers.push(mkLayer(layers.length));
@@ -1024,6 +1030,8 @@ function renderCards(){
     o.textContent=l.name+(l.id===sel?' (активный)':''); rs.appendChild(o); });
   rs.value=refId||'';
 }
+function refreshFiles(){ /* image status changed; don't rebuild under a focused path field */
+  if(booted&&!$('fileRows').contains(document.activeElement)) renderFiles(); }
 function renderFiles(){
   const box=$('fileRows'); box.innerHTML='';
   layers.forEach(l=>{
@@ -1185,7 +1193,7 @@ function sync(){
 }
 
 /* ---------- persistence ---------- */
-let saveTimer=null;
+let saveTimer=null, statusHold=0; /* project messages stay visible a few seconds */
 function snapshot(){
   return {v:4, count:layers.length, sel, refId, viewMode, swipe, view, boardSide, xray,
     inverted, grid, labels, blinkOn, tintMode,
@@ -1193,11 +1201,11 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, showSide, warpModel, imgDir};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, showSide, warpModel, imgDir, projName};
 }
-function save(){ if(!booted)return; clearTimeout(saveTimer);
+function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
-    $('saveStatus').innerHTML='Сохранено · '+new Date().toLocaleTimeString('ru-RU');
+    if(!quiet&&Date.now()>statusHold) $('saveStatus').innerHTML='Сохранено · '+new Date().toLocaleTimeString('ru-RU');
   }catch(err){ $('saveStatus').innerHTML='<span class="bad">Не сохранено: '+err.message+'</span>'; } },400);
 }
 function restore(s){
@@ -1228,14 +1236,19 @@ function restore(s){
   showSide=Object.assign({top:true,bot:true},s.showSide||{});
   selComp=null; calib=null; warpModel=s.warpModel==='persp'?'persp':'affine';
   imgDir=typeof s.imgDir==='string'?s.imgDir:'pcb_overlay_img/';
+  if(typeof s.projName==='string'&&s.projName) projName=s.projName;
   /* old saves kept only the bare file name for files picked via dialog */
   layers.forEach(l=>{ if(l.stored && l.src && !/[\/\\]/.test(l.src)) l.src=dirJoin(imgDir,l.src); });
   return true;
 }
+/* browser copy of a layer image: original blob in IndexedDB; older saves kept a webp in localStorage */
+function setBlobSrc(l,b){ if(l.url) URL.revokeObjectURL(l.url); l.url=URL.createObjectURL(b); l.el.src=l.url; }
 function loadImages(){
-  layers.forEach(l=>{ l.ok=false;
-    const data=l.stored? localStorage.getItem(IMGKEY(l.id)) : null;
-    if(data) l.el.src=data; else if(l.src) l.el.src=l.src; else l.el.removeAttribute('src');
+  layers.forEach(l=>{ l.ok=false; l.blob=null;
+    const fromPath=()=>{ const d=l.stored? localStorage.getItem(IMGKEY(l.id)) : null;
+      if(d) l.el.src=d; else if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); };
+    if(!l.stored){ fromPath(); return; }
+    idb.get(l.id).then(b=>{ if(b){ l.blob=b; setBlobSrc(l,b); } else fromPath(); }).catch(fromPath);
   });
 }
 function checkMissing(){
@@ -1249,12 +1262,19 @@ function checkMissing(){
     : 'Изображения не заданы. Вкладка ФАЙЛЫ.';
 }
 function setPath(l,v,reread){ v=(v||'').trim().replace(/\\/g,'/');
-  l.src=v; l.stored=false; localStorage.removeItem(IMGKEY(l.id)); l.ok=false;
+  l.src=v; l.stored=false; l.blob=null; localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{}); l.ok=false;
   if(v) l.el.src = reread ? v+(v.includes('?')?'&':'?')+'r='+Date.now() : v;
   else l.el.removeAttribute('src');
   save(); renderFiles(); sync(); }
 function storeFile(id,file){
   const l=byId(id); if(!l)return;
+  idb.put(l.id,file).then(()=>{
+    l.blob=file; l.stored=true; l.src=dirJoin(imgDir,file.name); l.ok=false; setBlobSrc(l,file);
+    localStorage.removeItem(IMGKEY(l.id)); save(); renderFiles(); sync();
+  }).catch(()=>storeFileLS(l,file));
+}
+function storeFileLS(l,file){ /* fallback without IndexedDB: compressed webp in localStorage */
+  l.blob=file;
   const fr=new FileReader();
   fr.onload=()=>{
     const im=new Image();
@@ -1274,6 +1294,150 @@ function storeFile(id,file){
     im.src=fr.result;
   };
   fr.readAsDataURL(file);
+}
+
+/* ---------- IndexedDB: original layer images ---------- */
+const idb=(()=>{ let db=null;
+  const open=()=>db||(db=new Promise((res,rej)=>{ const r=indexedDB.open('pcbreverse',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('img'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }));
+  const run=(mode,fn)=>open().then(d=>new Promise((res,rej)=>{ const t=d.transaction('img',mode);
+    const q=fn(t.objectStore('img')); t.oncomplete=()=>res(q&&q.result); t.onerror=()=>rej(t.error); }));
+  return { get:k=>run('readonly',s=>s.get(k)), put:(k,v)=>run('readwrite',s=>s.put(v,k)),
+           del:k=>run('readwrite',s=>s.delete(k)), clear:()=>run('readwrite',s=>s.clear()) };
+})();
+
+/* ---------- project file *.pcbr = zip (store, no compression) ---------- */
+const CRC_T=(()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(u){ let c=0xFFFFFFFF; for(let i=0;i<u.length;i++) c=CRC_T[(c^u[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zipStore(files){ /* [{name, data:Uint8Array}] -> Blob */
+  const enc=new TextEncoder(), body=[], dir=[]; let off=0;
+  const d=new Date(), tm=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),
+        dt=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  files.forEach(f=>{ const nm=enc.encode(f.name), crc=crc32(f.data), n=f.data.length;
+    const h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(6,0x0800,true);
+    h.setUint16(10,tm,true); h.setUint16(12,dt,true); h.setUint32(14,crc,true);
+    h.setUint32(18,n,true); h.setUint32(22,n,true); h.setUint16(26,nm.length,true);
+    body.push(h.buffer,nm,f.data);
+    const c=new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(8,0x0800,true);
+    c.setUint16(12,tm,true); c.setUint16(14,dt,true); c.setUint32(16,crc,true);
+    c.setUint32(20,n,true); c.setUint32(24,n,true); c.setUint16(28,nm.length,true); c.setUint32(42,off,true);
+    dir.push(c.buffer,nm);
+    off+=30+nm.length+n; });
+  const size=dir.reduce((a,b)=>a+b.byteLength,0), e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true);
+  e.setUint32(12,size,true); e.setUint32(16,off,true);
+  return new Blob([...body,...dir,e.buffer],{type:'application/zip'});
+}
+async function unzip(buf){ /* -> {name: Uint8Array}; store and deflate */
+  const u=new Uint8Array(buf), v=new DataView(buf), dec=new TextDecoder(); let e=-1;
+  for(let i=u.length-22;i>=Math.max(0,u.length-65557);i--) if(v.getUint32(i,true)===0x06054b50){e=i;break;}
+  if(e<0) throw new Error('файл не является архивом проекта');
+  const out={}; let p=v.getUint32(e+16,true);
+  for(let k=v.getUint16(e+10,true);k>0;k--){
+    if(v.getUint32(p,true)!==0x02014b50) throw new Error('повреждён каталог архива');
+    const m=v.getUint16(p+10,true), cs=v.getUint32(p+20,true), nl=v.getUint16(p+28,true),
+          xl=v.getUint16(p+30,true), cl=v.getUint16(p+32,true), lo=v.getUint32(p+42,true);
+    const name=dec.decode(u.subarray(p+46,p+46+nl)); p+=46+nl+xl+cl;
+    const ds=lo+30+v.getUint16(lo+26,true)+v.getUint16(lo+28,true); let data=u.subarray(ds,ds+cs);
+    if(m===8) data=new Uint8Array(await new Response(new Blob([data]).stream()
+      .pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    else if(m!==0) throw new Error('метод сжатия '+m+' не поддерживается');
+    if(!name.endsWith('/')) out[name]=data;
+  }
+  return out;
+}
+const MIME={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',
+  bmp:'image/bmp',svg:'image/svg+xml',tif:'image/tiff',tiff:'image/tiff'};
+const baseName=p=>(p||'').split(/[\\/]/).pop().split('?')[0];
+const extOf=n=>{ const m=/\.([a-z0-9]+)$/i.exec(n||''); return m?m[1].toLowerCase():''; };
+async function layerBlob(l){ /* original bytes of a layer image, or null if the page can't read them */
+  if(l.blob) return l.blob;
+  if(l.stored){ const b=await idb.get(l.id).catch(()=>null); if(b) return b;
+    const d=localStorage.getItem(IMGKEY(l.id)); if(d) return (await fetch(d)).blob(); }
+  if(l.src){
+    try{ const r=await fetch(l.src); if(r.ok) return await r.blob(); }catch(err){}
+    if(l.ok) try{ const c=document.createElement('canvas'); c.width=l.el.naturalWidth; c.height=l.el.naturalHeight;
+      c.getContext('2d').drawImage(l.el,0,0);
+      return await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(),'image/png')); }catch(err){} /* file:// taints canvas */
+  }
+  return null;
+}
+let missLayers=[];
+async function saveProject(skipMissing){
+  const st=$('saveStatus'); st.textContent='Сборка проекта…'; $('missRow').hidden=true;
+  const imgs=[], miss=[];
+  for(const l of layers){ if(!l.src&&!l.stored) continue;
+    const b=await layerBlob(l); if(b) imgs.push({l,b}); else miss.push(l); }
+  if(miss.length&&!skipMissing){ missLayers=miss;
+    st.innerHTML='<span class="bad">Нет доступа к картинкам (страница открыта с диска):</span><br>'+
+      miss.map(l=>'<b>'+l.name+'</b> — '+(baseName(l.src)||'?')).join('<br>')+
+      '<br>Укажите эти файлы — они сохранятся в браузере, дальше не спросит.';
+    $('missRow').hidden=false; return; }
+  const s=snapshot(), files=[], used=new Set();
+  for(const {l,b} of imgs){
+    const ext=extOf(baseName(l.src))||Object.keys(MIME).find(k=>MIME[k]===b.type)||'png';
+    let nm='images/'+l.id+'_'+(baseName(l.src).replace(/\.[^.]*$/,'')||'image')+'.'+ext;
+    while(used.has(nm)) nm=nm.replace(/(\.[^.]*)$/,'_$1'); used.add(nm);
+    s.layers.find(d=>d.id===l.id).file=nm;
+    files.push({name:nm, data:new Uint8Array(await b.arrayBuffer())});
+  }
+  files.unshift({name:'project.json', data:new TextEncoder().encode(JSON.stringify(s,null,1))});
+  const zip=zipStore(files), fname=projName+'.pcbr';
+  try{
+    if(!window.showSaveFilePicker) throw 0;
+    const h=await showSaveFilePicker({suggestedName:fname,
+      types:[{description:'Проект PCBReverse',accept:{'application/zip':['.pcbr']}}]});
+    const w=await h.createWritable(); await w.write(zip); await w.close();
+    projName=h.name.replace(/\.pcbr$/i,'')||projName;
+  }catch(err){
+    if(err&&err.name==='AbortError'){ st.textContent='Сохранение отменено.'; return; }
+    const a=document.createElement('a'); a.href=URL.createObjectURL(zip); a.download=fname; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }
+  st.innerHTML='<span class="good">Проект сохранён: '+projName+'.pcbr</span> · картинок '+imgs.length+
+    (miss.length?' · <span class="bad">без картинок: '+miss.map(l=>l.name).join(', ')+'</span>':'')+
+    ' · '+(zip.size/1048576).toFixed(1)+' МБ';
+  statusHold=Date.now()+5000; save(true);
+}
+function pickMissing(files){
+  const left=[...missLayers];
+  [...files].forEach(f=>{ const i=left.findIndex(l=>baseName(l.src).toLowerCase()===f.name.toLowerCase());
+    if(i>=0) adoptFile(left.splice(i,1)[0],f); });
+  if(left.length===1&&files.length===1&&missLayers.length===1) adoptFile(left.pop(),files[0]);
+  saveProject(false);
+}
+function adoptFile(l,f){ /* keep the original next to the layer; path stays as is */
+  l.blob=f; l.stored=true; idb.put(l.id,f).catch(()=>{}); }
+function afterLoad(msg){
+  renderCards(); renderFiles(); renderNets(); renderComps(); applyAll(); applyView(); sync(); checkMissing();
+  $('missRow').hidden=true; $('saveStatus').innerHTML='<span class="good">'+msg+'</span>'; statusHold=Date.now()+5000; save(true);
+}
+async function loadProject(f){
+  const st=$('saveStatus');
+  try{
+    if(/\.json$/i.test(f.name)){ /* old JSON export */
+      const s=JSON.parse(await f.text()); if(!restore(s)) throw new Error('нет слоёв');
+      loadImages(); afterLoad('Загружено (JSON): '+f.name); return; }
+    st.textContent='Чтение проекта…';
+    const ent=await unzip(await f.arrayBuffer());
+    if(!ent['project.json']) throw new Error('в архиве нет project.json');
+    const s=JSON.parse(new TextDecoder().decode(ent['project.json']));
+    layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
+    await idb.clear().catch(()=>{});
+    if(!restore(s)) throw new Error('нет слоёв');
+    projName=f.name.replace(/\.(pcbr|zip)$/i,'');
+    let n=0;
+    for(const d of s.layers){ const l=byId(d.id); if(!l) continue; l.ok=false; l.blob=null;
+      const data=d.file&&ent[d.file];
+      if(data){ const b=new Blob([data],{type:MIME[extOf(d.file)]||''});
+        l.blob=b; l.stored=true; setBlobSrc(l,b); idb.put(l.id,b).catch(()=>{}); n++; }
+      else { l.stored=false; if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); }
+    }
+    afterLoad('Проект загружен: '+f.name+' · картинок '+n);
+  }catch(err){ st.innerHTML='<span class="bad">Ошибка загрузки: '+err.message+'</span>'; }
 }
 
 /* ---------- interaction ---------- */
@@ -1495,22 +1659,16 @@ $('labelsBtn').onclick=()=>{labels=!labels;sync();drawMarks();save()};
 $('imgDir').onchange=e=>{ imgDir=e.target.value.trim().replace(/\\/g,'/'); save(); };
 $('layerCount').onchange=e=>setCount(parseInt(e.target.value,10));
 $('fileImg').onchange=e=>{const f=e.target.files[0]; if(f&&browseTarget)storeFile(browseTarget,f); e.target.value='';};
-$('exportBtn').onclick=()=>{
-  const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-  a.download='pcb_overlay_state.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);};
-$('importBtn').onclick=()=>$('fileJson').click();
-$('fileJson').onchange=e=>{const f=e.target.files[0]; if(!f)return;
-  const rd=new FileReader();
-  rd.onload=()=>{ try{ const s=JSON.parse(rd.result);
-      if(restore(s)){ loadImages(); renderCards(); renderFiles(); renderNets();
-        applyAll(); applyView(); sync(); checkMissing();
-        $('saveStatus').innerHTML='<span class="good">Импортировано: '+f.name+'</span>'; save(); }
-    }catch(err){ $('saveStatus').innerHTML='<span class="bad">Ошибка импорта: '+err.message+'</span>'; } };
-  rd.readAsText(f); e.target.value='';};
+$('projSave').onclick=()=>saveProject(false);
+$('projLoad').onclick=()=>$('fileProj').click();
+$('fileProj').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) loadProject(f); };
+$('missPick').onclick=()=>$('fileMany').click();
+$('missSkip').onclick=()=>saveProject(true);
+$('fileMany').onchange=e=>{ const fs=[...e.target.files]; e.target.value=''; if(fs.length) pickMissing(fs); };
 $('saveNow').onclick=()=>{booted=true;save()};
 $('resetAll').onclick=()=>{ localStorage.removeItem(KEY);
-  layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id))); location.reload(); };
+  layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
+  idb.clear().catch(()=>{}).then(()=>location.reload()); };
 
 addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
