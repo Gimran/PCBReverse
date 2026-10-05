@@ -409,12 +409,8 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 
       <div data-page="data" hidden>
         <div class="sect">
-          <div class="row"><span class="lbl" style="flex:none">Количество слоёв</span>
-            <select id="layerCount" class="slim">
-              <option>2</option><option>3</option><option>4</option>
-              <option>5</option><option>6</option><option>7</option><option>8</option>
-            </select></div>
-          <div class="status">Лишние слои удаляются вместе со своими точками.</div>
+          <button class="mini wide" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
+          <div class="status">Слой удаляется кнопкой ✕ в его строке — вместе со своими точками нетов и опорными парами.</div>
           <div class="row"><span class="lbl" style="flex:none">Папка картинок</span>
             <input type="text" class="path" id="imgDir" spellcheck="false"
               title="куда смотрят «Выбрать файл…» и «Перечитать файл»; относительно html"></div>
@@ -557,22 +553,27 @@ function restack(){
   layers=layers.map((l,i)=>[l,i]).sort((a,b)=>grp(a[0])-grp(b[0])||a[1]-b[1]).map(x=>x[0]);
   layers.forEach((l,i)=>{ l.clip.style.zIndex=i+1; stack.appendChild(l.clip); });
 }
-function setCount(n){
-  n=Math.max(2,Math.min(8,n|0));
-  while(layers.length>n){ /* drop the most recently added layer (highest L-number), not the top of the stack */
-    const num=x=>parseInt(x.id.slice(1),10)||0;
-    const l=layers.reduce((a,b)=>num(b)>num(a)?b:a); layers=layers.filter(x=>x!==l);
-    points=points.filter(p=>p.layer!==l.id);
-    layers.forEach(o=>o.pairs=o.pairs.filter(pr=>pr.rl!==l.id));
-    localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{});
-    l.clip.remove(); l.fx.node.remove();
-  }
-  while(layers.length<n) layers.push(mkLayer(layers.length));
+function layersChanged(){
   restack();
   if(!byId(sel)) sel=layers[layers.length-1].id;
   if(!byId(refId)||refId===sel) refId=(layers.find(l=>l.id!==sel)||layers[0]).id;
-  renderCards(); renderFiles(); loadImages(); layers.forEach(applyLayer);
+  renderCards(); renderFiles(); layers.forEach(applyLayer); applyClip();
   sync(); checkMissing(); save();
+}
+function addLayer(){ /* new layer on the current board side, top of its group, becomes active */
+  const n=parseInt(freeId().slice(1),10);
+  const l=mkLayer(n-1,{side:boardSide}); l.name='Слой '+n;
+  layers.push(l); sel=l.id; layersChanged(); return l;
+}
+function removeLayer(l){
+  if(layers.length<=1) return;
+  layers=layers.filter(x=>x!==l);
+  points=points.filter(p=>p.layer!==l.id);
+  layers.forEach(o=>o.pairs=o.pairs.filter(pr=>pr.rl!==l.id));
+  localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{});
+  if(l.url) URL.revokeObjectURL(l.url);
+  l.clip.remove(); l.fx.node.remove();
+  renderNets(); layersChanged(); drawMarks();
 }
 
 /* ---------- geometry ---------- */
@@ -1099,7 +1100,7 @@ function renderCards(){
     [['any','обе'],['top','TOP'],['bot','BOT']].forEach(([v,t])=>{
       const o=document.createElement('option'); o.value=v; o.textContent=t; sSel.appendChild(o); });
     sSel.value=l.side||'any';
-    sSel.onchange=()=>{ l.side=sSel.value; restack(); renderCards(); applyAll(); sync(); save(); };
+    sSel.onchange=()=>{ l.side=sSel.value; restack(); renderCards(); renderFiles(); applyAll(); sync(); save(); };
     const up=document.createElement('button'); up.className='ibtn'; up.textContent='▲'; up.title='выше';
     up.disabled=i===layers.length-1||grp(layers[i+1])!==grp(l);
     up.onclick=()=>{ layers.splice(i,1); layers.splice(i+1,0,l); restack(); renderCards(); applyAll(); save(); };
@@ -1162,14 +1163,23 @@ function refreshFiles(){ /* image status changed; don't rebuild under a focused 
   if(booted&&!$('fileRows').contains(document.activeElement)) renderFiles(); }
 function renderFiles(){
   const box=$('fileRows'); box.innerHTML='';
-  layers.forEach(l=>{
+  [...layers].reverse().forEach(l=>{
     const row=document.createElement('div'); row.className='filerow';
     const cap=document.createElement('div'); cap.className='cap';
     const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.color;
     const t=document.createElement('input'); t.type='text'; t.className='lname'; t.value=l.name;
     t.spellcheck=false; t.placeholder='имя слоя';
     t.oninput=e=>{ l.name=e.target.value; l.el.alt=e.target.value; renderCards(); sync(); save(); };
-    cap.append(sw,t);
+    const sd=document.createElement('select'); sd.className='slim tagsel'; sd.title='сторона (метка) слоя';
+    [['any','обе'],['top','TOP'],['bot','BOT']].forEach(([v,tx])=>{
+      const o=document.createElement('option'); o.value=v; o.textContent=tx; sd.appendChild(o); });
+    sd.value=l.side||'any'; sd.style.width='auto'; sd.style.flex='none';
+    sd.onchange=()=>{ l.side=sd.value; restack(); renderCards(); renderFiles(); applyAll(); sync(); save(); };
+    const del=document.createElement('button'); del.className='ibtn'; del.textContent='✕'; del.title='удалить слой';
+    del.disabled=layers.length<=1;
+    del.onclick=()=>{ const np=points.filter(p=>p.layer===l.id).length;
+      if(confirm('Удалить слой «'+l.name+'»'+(np?' и его точки нетов ('+np+')':'')+'?')) removeLayer(l); };
+    cap.append(sw,t,sd,del);
     const path=document.createElement('input'); path.type='text'; path.className='path'; path.value=l.src;
     path.spellcheck=false;
     path.onchange=()=>setPath(l,path.value.trim());
@@ -1311,7 +1321,6 @@ function sync(){
   $('moveBtn').disabled=!!(sel_()&&sel_().H);
   $('gridBtn').classList.toggle('on',grid); vp.classList.toggle('nogrid',!grid);
   $('invBtn').classList.toggle('on',inverted);
-  $('layerCount').value=String(layers.length);
   if(document.activeElement!==$('imgDir')) $('imgDir').value=imgDir;
   $('flipBoard').textContent='Плата: '+(boardSide==='top'?'TOP':'BOT')+' · перевернуть (F)';
   $('xrayBtn').classList.toggle('on',xray);
@@ -1837,7 +1846,7 @@ $('clearNetPts').onclick=()=>{points=points.filter(p=>p.net!==activeNet);selPoin
 $('labelsBtn').onclick=()=>{labels=!labels;sync();drawMarks();save()};
 
 $('imgDir').onchange=e=>{ imgDir=e.target.value.trim().replace(/\\/g,'/'); save(); };
-$('layerCount').onchange=e=>setCount(parseInt(e.target.value,10));
+$('addLayer').onclick=()=>{ const l=addLayer(); browseTarget=l.id; $('fileImg').click(); };
 $('fileImg').onchange=e=>{const f=e.target.files[0]; if(f&&browseTarget)storeFile(browseTarget,f); e.target.value='';};
 $('projSave').onclick=()=>saveProject(false);
 $('projLoad').onclick=()=>$('fileProj').click();
