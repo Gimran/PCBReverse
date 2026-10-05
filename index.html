@@ -90,7 +90,7 @@ svg.marks{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visi
 .panel{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 @media (max-width:880px){ .panel{border-left:0;border-top:1px solid var(--line)} }
 .phead{padding:13px 16px 11px;border-bottom:1px solid var(--line)}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line)}
 .lpanel .tabs{grid-template-columns:repeat(4,1fr) 30px}
 .tabs button{border:0;border-radius:0;background:transparent;box-shadow:none;padding:9px 4px;
   font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.05em;color:var(--muted);
@@ -192,6 +192,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 .empty{font-size:12px;color:var(--muted);font-style:italic}
 .filerow{border:1px solid var(--line);border-radius:5px;background:var(--panel-2);padding:8px;
   display:flex;flex-direction:column;gap:7px}
+.filerow.sel{border-color:var(--text)}
 .filerow .cap{display:flex;align-items:center;gap:6px;font-weight:600;font-size:12.5px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -382,6 +383,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       <button class="on" data-tab="view">СЛОИ</button>
       <button data-tab="nets">NETS</button>
       <button data-tab="data">ФАЙЛЫ</button>
+      <button data-tab="video" title="экспериментально: камера / USB-микроскоп">ВИДЕО</button>
     </div>
 
     <div class="pages">
@@ -419,13 +421,15 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
         </div>
       </div>
 
+      <div data-page="video" hidden>
+        <div class="sect">
+          <button class="mini wide" id="addVideo" title="слой с камеры / USB-микроскопа; кроп, коррекция, ручная деформация — во вкладке СЛОЙ, когда он активен">+ Видеослой</button>
+        </div>
+        <div class="sect" id="vidRows" style="gap:8px"></div>
+      </div>
       <div data-page="data" hidden>
         <div class="sect">
-          <div class="modes two">
-            <button class="mini" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
-            <button class="mini" id="addVideo" title="экспериментально: изображение с камеры / USB-микроскопа как слой">+ Видеослой</button>
-          </div>
-          <div class="status">Слой удаляется кнопкой ✕ в его строке — вместе со своими точками NET и опорными парами.</div>
+          <button class="mini wide" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
           <div class="row"><span class="lbl" style="flex:none">Папка картинок</span>
             <input type="text" class="path" id="imgDir" spellcheck="false"
               title="куда смотрят «Выбрать файл…» и «Перечитать файл»; относительно html"></div>
@@ -439,17 +443,10 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="missSkip" style="flex:1">Сохранить без них</button>
           </div>
           <div class="modes two">
-            <button class="mini" id="projSave">Сохранить проект</button>
-            <button class="mini" id="projLoad">Загрузить проект</button>
-            <button class="mini" id="saveNow">Сохранить сейчас</button>
-            <button class="mini" id="resetAll">Сбросить всё</button>
-          </div>
-          <div class="keys">
-            <b>Проект *.pcbr</b> — zip без сжатия: project.json<br>
-            (слои, деформация, NET, компоненты, вид) + оригиналы картинок.<br>
-            «Выбрать файл…» — оригинал хранится в браузере (IndexedDB);<br>
-            путь записывается как <b>папка картинок + имя файла</b>.<br>
-            «Перечитать файл» — загрузить по пути с диска заново.
+            <button class="mini" id="projSave" title="*.pcbr — zip без сжатия: project.json (слои, деформация, NET, компоненты, вид) + оригиналы картинок">Сохранить проект</button>
+            <button class="mini" id="projLoad" title="открыть *.pcbr (или старый JSON-экспорт)">Загрузить проект</button>
+            <button class="mini" id="saveNow" title="записать состояние в браузер сейчас (автосохранение и так включено)">Сохранить сейчас</button>
+            <button class="mini" id="resetAll" title="очистить состояние и картинки в браузере и перезагрузить страницу">Сбросить всё</button>
           </div>
         </div>
       </div>
@@ -569,7 +566,7 @@ function restack(){
   layers=layers.map((l,i)=>[l,i]).sort((a,b)=>grp(a[0])-grp(b[0])||a[1]-b[1]).map(x=>x[0]);
   const kids=layers.filter(l=>parentOf(l)), tops=layers.filter(l=>!parentOf(l)), out=[];
   tops.forEach(t=>{ out.push(t); kids.filter(k=>k.parent===t.id).forEach(k=>out.push(k)); });
-  layers=out;
+  layers=[...out.filter(l=>l.kind!=='video'),...out.filter(l=>l.kind==='video')];
   layers.forEach((l,i)=>{ l.clip.style.zIndex=i+1; stack.appendChild(l.clip); });
 }
 function layersChanged(){
@@ -618,7 +615,7 @@ function stopCam(l){ if(l.stream){ l.stream.getTracks().forEach(t=>t.stop()); l.
 let camList=[];
 async function listCams(){ try{ camList=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'); }catch(err){} }
 function addVideoLayer(){
-  const l=addLayer(); l.kind='video'; l.name='Видео '+l.id.slice(1); l.fe=.15; attachVideo(l); startCam(l); return l;
+  const l=addLayer(); l.kind='video'; l.name='Видео '+l.id.slice(1); l.fe=.15; attachVideo(l); layersChanged(); startCam(l); return l;
 }
 function snapLayer(l){ /* freeze the current frame into a new image layer at the same place */
   const v=l.vid; if(!v||!v.videoWidth) return;
@@ -635,7 +632,7 @@ function snapLayer(l){ /* freeze the current frame into a new image layer at the
 function mainOf(side){ return layers.find(x=>x.main&&x.side===side&&x.kind!=='video'); }
 function snapPatch(l){ /* frame -> image layer at the same place, sub-layer of the side's main layer (TOP main / BOT main) */
   const side=(l.side==='top'||l.side==='bot')?l.side:boardSide, M=mainOf(side);
-  if(!M){ l.camErr='нет главного слоя — поставьте метку «'+side.toUpperCase()+' main»'; renderFiles(); return; }
+  if(!M){ l.camErr='нет главного слоя — поставьте метку «'+side.toUpperCase()+' main»'; renderVideo(); return; }
   const v=l.vid; if(!v||!v.videoWidth) return;
   const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
   c.getContext('2d').drawImage(v,0,0);
@@ -1223,7 +1220,7 @@ const parentOf=l=>l.parent?byId(l.parent):null;
 function renderCards(){
   const box=$('layerCards'); box.innerHTML='';
   let lastG=null;
-  [...layers].reverse().forEach(l=>{
+  [...layers].reverse().forEach(l=>{ if(l.kind==='video') return;   /* video layer lives in the ВИДЕО tab */
     const i=idx(l.id);
     if(grp(l)!==lastG){ lastG=grp(l); const sp=document.createElement('div'); sp.className='lsep';
       sp.textContent=['обе','BOT','TOP'][lastG]; box.appendChild(sp); }
@@ -1241,7 +1238,7 @@ function renderCards(){
     const sl=document.createElement('span'); sl.className='lbl tag'; sl.textContent='метка';
     const sSel=sideSel(l);
     const up=document.createElement('button'); up.className='ibtn'; up.textContent='▲'; up.title='выше';
-    const peers=layers.filter(o=>grp(o)===grp(l)&&(parentOf(l)?o.parent===l.parent:!parentOf(o))), pi=peers.indexOf(l);
+    const peers=layers.filter(o=>o.kind!=='video'&&grp(o)===grp(l)&&(parentOf(l)?o.parent===l.parent:!parentOf(o))), pi=peers.indexOf(l);
     const swap=o=>{ const a=layers.indexOf(l), b=layers.indexOf(o); layers[a]=o; layers[b]=l;
       restack(); renderCards(); renderFiles(); applyAll(); save(); };
     up.disabled=pi>=peers.length-1;
@@ -1302,11 +1299,13 @@ function renderCards(){
     o.textContent=l.name+(l.id===sel?' (активный)':''); rs.appendChild(o); });
   rs.value=refId||'';
 }
-function refreshFiles(force){ /* image status changed; don't rebuild under a focused path field */
-  if(booted&&(force||!$('fileRows').contains(document.activeElement))) renderFiles(); }
+function refreshFiles(force){ /* image status changed; don't rebuild under a focused path/name field */
+  if(!booted) return;
+  if(force||!$('fileRows').contains(document.activeElement)) renderFiles();
+  else renderVideo(); }
 function renderFiles(){
   const box=$('fileRows'); box.innerHTML='';
-  [...layers].reverse().forEach(l=>{
+  [...layers].reverse().forEach(l=>{ if(l.kind==='video') return;
     const row=document.createElement('div'); row.className='filerow';
     const cap=document.createElement('div'); cap.className='cap';
     const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.tc; sw.dataset.lid=l.id;
@@ -1319,51 +1318,85 @@ function renderFiles(){
     del.onclick=()=>{ const np=points.filter(p=>p.layer===l.id).length;
       if(confirm('Удалить слой «'+l.name+'»'+(np?' и его точки NET ('+np+')':'')+'?')) removeLayer(l); };
     cap.append(sw,t,sd,del);
-    if(l.kind==='video'){
-      const cs=document.createElement('select'); cs.className='slim'; cs.title='камера';
-      const opts=camList.length?camList:[{deviceId:l.camId||'',label:'камера'}];
-      opts.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||('камера '+(i+1)); cs.appendChild(o); });
-      cs.value=l.camId||''; cs.onchange=()=>{ l.camId=cs.value; startCam(l); };
-      const st=document.createElement('div'); st.className='status';
-      const v=l.vid, live=!!l.stream;
-      st.innerHTML = live ? `<span class="good">видео идёт</span> · ${v.videoWidth}×${v.videoHeight}`
-        : '<span class="bad">'+(l.camErr||'камера остановлена')+'</span>';
-      const fr=document.createElement('div'); fr.className='row';
-      const fl=document.createElement('span'); fl.className='lbl'; fl.style.flex='none'; fl.textContent='края';
-      const fi=document.createElement('input'); fi.type='range'; fi.min=0; fi.max=50; fi.value=Math.round((l.fe||0)*100);
-      fi.title='размытие краёв кадра (участок задаёт кроп слоя); переходит в снимок';
-      const fv=document.createElement('span'); fv.className='val'; fv.textContent=fi.value+'%';
-      fi.oninput=()=>{ l.fe=fi.value/100; fv.textContent=fi.value+'%'; applyLayer(l); sync(); };
-      fr.append(fl,fi,fv);
-      const btns=document.createElement('div'); btns.className='modes two';
-      const b1=document.createElement('button'); b1.className='mini'; b1.textContent=live?'Стоп':'Старт';
-      b1.onclick=()=>{ if(l.stream){ stopCam(l); renderFiles(); } else startCam(l); };
-      const sd2=(l.side==='top'||l.side==='bot')?l.side:boardSide, M=mainOf(sd2);
-      const b4=document.createElement('button'); b4.className='mini'; b4.textContent='Снимок → '+sd2.toUpperCase()+' main';
-      b4.title='кадр — подслоем главного слоя стороны'+(M?' «'+M.name+'»':' (не назначен: метка «'+sd2.toUpperCase()+' main»)');
-      b4.disabled=!live||!M; b4.onclick=()=>snapPatch(l);
-      const b2=document.createElement('button'); b2.className='mini'; b2.textContent='Снимок в слой';
-      b2.title='текущий кадр — отдельным слоем-картинкой на том же месте'; b2.disabled=!live; b2.onclick=()=>snapLayer(l);
-      const b3=document.createElement('button'); b3.className='mini'; b3.textContent='обновить список';
-      b3.onclick=async()=>{ await listCams(); renderFiles(); };
-      btns.append(b1,b4,b2,b3);
-      row.append(cap,cs,st,fr,btns); box.appendChild(row); return;
-    }
     const path=document.createElement('input'); path.type='text'; path.className='path'; path.value=l.src;
     path.spellcheck=false;
     path.onchange=()=>setPath(l,path.value.trim());
+    path.title = (l.stored ? 'копия в браузере; «Перечитать» возьмёт с диска' : (l.ok?'файл по пути загружен':'файл не задан'))+
+      ' · путь = папка картинок + имя файла';
     const st=document.createElement('div'); st.className='status';
-    st.innerHTML = l.stored
-      ? '<span class="good">копия в браузере</span> · «Перечитать» возьмёт с диска'
-      : (l.ok?'файл по пути загружен':(l.src?'<span class="bad">не загружен</span>':'файл не задан'));
+    if(!l.ok&&(l.src||l.stored)) st.innerHTML='<span class="bad">не загружен</span>'; else st.hidden=true;
     const btns=document.createElement('div'); btns.className='modes two';
     const b1=document.createElement('button'); b1.className='mini'; b1.textContent='Выбрать файл…';
+    b1.title='картинка с диска; оригинал хранится в браузере (IndexedDB)';
     b1.onclick=()=>{browseTarget=l.id;$('fileImg').click()};
     const b2=document.createElement('button'); b2.className='mini'; b2.textContent='Перечитать файл';
     b2.title='загрузить файл по пути заново с диска (после его обновления)';
     b2.onclick=()=>setPath(l,path.value,true);
     btns.append(b1,b2);
     row.append(cap,path,st,btns); box.appendChild(row);
+  });
+  renderVideo();
+}
+/* ВИДЕО tab: video layers live here only (not in СЛОИ / ФАЙЛЫ); the block selects the layer as active */
+function renderVideo(){
+  const box=$('vidRows'); if(!box) return; box.innerHTML='';
+  const vids=layers.filter(l=>l.kind==='video');
+  if(!vids.length){ const d=document.createElement('div'); d.className='empty'; d.textContent='Видеослоя нет.'; box.appendChild(d); return; }
+  vids.forEach(l=>{
+    const row=document.createElement('div'); row.className='filerow'+(l.id===sel?' sel':'');
+    row.onclick=e=>{ if(/INPUT|BUTTON|SELECT|OPTION/.test(e.target.tagName)||l.id===sel) return;
+      sel=l.id; if(refId===sel) refId=(layers.find(x=>x.id!==sel)||l).id; renderCards(); renderVideo(); applyAll(); sync(); };
+    const cap=document.createElement('div'); cap.className='cap';
+    const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.tc; sw.dataset.lid=l.id;
+    const t=document.createElement('input'); t.type='text'; t.className='lname'; t.value=l.name; t.spellcheck=false;
+    t.oninput=e=>{ l.name=e.target.value; sync(); save(); };
+    const sd=document.createElement('select'); sd.className='slim tagsel'; sd.title='сторона: на какую плату снимает (куда идут снимки)';
+    [['any','обе'],['top','TOP'],['bot','BOT']].forEach(([v,tx])=>{ const o=document.createElement('option'); o.value=v; o.textContent=tx; sd.appendChild(o); });
+    sd.value=l.side||'any'; sd.style.width='auto'; sd.style.flex='none';
+    sd.onchange=()=>{ l.side=sd.value; restack(); renderVideo(); applyAll(); sync(); save(); };
+    const eye=document.createElement('button'); eye.className='ibtn'; eye.textContent=l.on?'●':'○'; eye.title='видимость';
+    eye.onclick=()=>{ l.on=!l.on; renderVideo(); applyAll(); sync(); };
+    const del=document.createElement('button'); del.className='ibtn'; del.textContent='✕'; del.title='удалить видеослой';
+    del.onclick=()=>{ if(confirm('Удалить видеослой «'+l.name+'»?')) removeLayer(l); };
+    cap.append(sw,t,sd,eye,del);
+    const cs=document.createElement('select'); cs.className='slim'; cs.title='камера';
+    const opts=camList.length?camList:[{deviceId:l.camId||'',label:'камера'}];
+    opts.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||('камера '+(i+1)); cs.appendChild(o); });
+    cs.value=l.camId||''; cs.onchange=()=>{ l.camId=cs.value; startCam(l); };
+    const v=l.vid, live=!!l.stream;
+    const st=document.createElement('div'); st.className='status';
+    st.innerHTML = live ? `<span class="good">видео идёт</span> · ${v.videoWidth}×${v.videoHeight}`
+      : '<span class="bad">'+(l.camErr||'камера остановлена')+'</span>';
+    const sl=(lab,val,max,tt,fn)=>{ const r=document.createElement('div'); r.className='row'; r.title=tt;
+      const a=document.createElement('span'); a.className='lbl'; a.style.flex='none'; a.style.width='40px'; a.textContent=lab;
+      if(lab==='α'){ a.style.textTransform='none'; a.style.fontSize='12px'; }
+      const i=document.createElement('input'); i.type='range'; i.min=0; i.max=max; i.value=val;
+      const vv=document.createElement('span'); vv.className='val'; vv.textContent=val+'%';
+      i.oninput=()=>{ vv.textContent=i.value+'%'; fn(+i.value); }; r.append(a,i,vv); return r; };
+    const ra=sl('α',Math.round(l.op*100),100,'непрозрачность видео',x=>{ l.op=x/100; applyLayer(l); });
+    const rf=sl('края',Math.round((l.fe||0)*100),50,'размытие краёв кадра (участок задаёт кроп во вкладке СЛОЙ); переходит в снимок',
+      x=>{ l.fe=x/100; applyLayer(l); sync(); });
+    const fl=document.createElement('div'); fl.className='modes';
+    [['⇄','fh','отразить по горизонтали'],['⇅','fv','отразить по вертикали'],['↺',-90,'повернуть −90°'],['↻',90,'повернуть +90°']].forEach(([tx,a,tt])=>{
+      const b=document.createElement('button'); b.className='mini'; b.textContent=tx; b.title=tt;
+      if(l[a]===true) b.classList.add('on');
+      b.onclick=()=>{ if(l.H){l.H=null;warpInfo='';}
+        if(typeof a==='string') l[a]=!l[a]; else { l.rot=Math.round((l.rot+a)*10)/10; if(l.rot>180)l.rot-=360; if(l.rot<-180)l.rot+=360; }
+        applyLayer(l); renderVideo(); sync(); };
+      fl.appendChild(b); });
+    const btns=document.createElement('div'); btns.className='modes two';
+    const b1=document.createElement('button'); b1.className='mini'; b1.textContent=live?'Стоп':'Старт';
+    b1.onclick=()=>{ if(l.stream){ stopCam(l); renderVideo(); } else startCam(l); };
+    const b3=document.createElement('button'); b3.className='mini'; b3.textContent='обновить список'; b3.title='заново найти камеры';
+    b3.onclick=async()=>{ await listCams(); renderVideo(); };
+    const sd2=(l.side==='top'||l.side==='bot')?l.side:boardSide, M=mainOf(sd2);
+    const b4=document.createElement('button'); b4.className='mini'; b4.textContent='Снимок → '+sd2.toUpperCase()+' main';
+    b4.title='кадр — подслоем главного слоя стороны'+(M?' «'+M.name+'»':' (не назначен: метка «'+sd2.toUpperCase()+' main»)');
+    b4.disabled=!live||!M; b4.onclick=()=>snapPatch(l);
+    const b2=document.createElement('button'); b2.className='mini'; b2.textContent='Снимок в слой';
+    b2.title='текущий кадр — отдельным слоем-картинкой на том же месте'; b2.disabled=!live; b2.onclick=()=>snapLayer(l);
+    btns.append(b1,b3,b4,b2);
+    row.append(cap,cs,st,ra,rf,fl,btns); box.appendChild(row);
   });
 }
 
