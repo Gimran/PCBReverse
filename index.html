@@ -250,8 +250,8 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>колесо</b> — зум · <b>средняя кнопка</b> — панорама<br><b>R</b> / <b>Shift+R</b> — поворот вида на 90°<br><b>H</b> / <b>V</b> — отражение вида<br>
             <b>M</b> — сдвиг слоя мышью и стрелками<br><b>F</b> — переворот платы<br>
             <b>[ ]</b> — поворот 0.1° · <b>Shift</b> — ×10<br>
-            <b>P</b> — опорные точки · <b>N</b> — точки нета · <b>K</b> — компоненты<br>
-            <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> по точке/компоненту — удалить · <b>Esc</b> — выход
+            <b>P</b> — опорные точки · <b>N</b> — редактирование нетов · <b>K</b> — редактирование компонентов<br>
+            <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> / <b>Delete</b> — удалить (только в режимах N / K) · <b>Esc</b> — выход
           </div>
         </div>
       </div>
@@ -290,7 +290,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <select id="compSide" class="slim">
             <option value="top">top-comp</option><option value="bot">bot-comp</option>
           </select></div>
-        <button class="mini wide" id="compPick" disabled>Режим установки</button>
+        <button class="mini wide" id="compPick" disabled>Редактирование компонентов (K)</button>
         <div class="status" id="compStatus"></div>
       </div>
 
@@ -349,7 +349,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 
       <div data-page="nets" hidden>
         <div class="sect">
-          <button class="mini wide" id="netPickBtn">Ставить точки нета</button>
+          <button class="mini wide" id="netPickBtn">Редактирование нетов (N)</button>
           <div class="status" id="netStatus"></div>
           <div class="modes two">
             <button class="mini" id="addNet">+ нет</button>
@@ -780,16 +780,19 @@ function hitComp(m){
 }
 /* net point inside a pin's zone (its half of the body, with a margin) sets that pin's net;
    only points on visible layers, the active layer wins, then the one closest to the pad */
-function autoPins(c){
+function pinZone(c,w){ /* world point -> {key:'n1'|'n2', d: distance to pad centre} or null */
   const g=PKG[c.size], k=mmScale||1, hl=g.L/2*k, hw=g.W/2*k, t=g.T*k;
   const a=-(c.rot||0)*Math.PI/180, co=Math.cos(a), si=Math.sin(a);
+  const dx=w.x-c.x, dy=w.y-c.y, u=dx*co-dy*si, v=dx*si+dy*co;
+  if(Math.abs(u)>hl+g.L*k*.15 || Math.abs(v)>hw+g.W*k*.25) return null;
+  return {key:u<0?'n1':'n2', d:Math.hypot(Math.abs(u)-(hl-t/2),v)};
+}
+function autoPins(c){
   const best={n1:null,n2:null};
   points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
     if(!net||!net.on||!lay||!layerShown(lay))return;
-    const w=worldOf(lay,pt.p), dx=w.x-c.x, dy=w.y-c.y;
-    const u=dx*co-dy*si, v=dx*si+dy*co;
-    if(Math.abs(u)>hl+g.L*k*.15 || Math.abs(v)>hw+g.W*k*.25) return;
-    const key=u<0?'n1':'n2', d=Math.hypot(Math.abs(u)-(hl-t/2),v), pri=lay.id===sel?0:1;
+    const z=pinZone(c,worldOf(lay,pt.p)); if(!z)return;
+    const key=z.key, d=z.d, pri=lay.id===sel?0:1;
     const b=best[key]; if(!b||pri<b.pri||(pri===b.pri&&d<b.d)) best[key]={net:net.id,pri,d};
   });
   let ch=false;
@@ -798,6 +801,15 @@ function autoPins(c){
   [['n1','n2'],['n2','n1']].forEach(([k2,o])=>{
     if(best[k2]&&!best[o]&&c[o]===best[k2].net){ c[o]=null; ch=true; } });
   return ch;
+}
+function pinFromPoint(w,net){ /* new net point: write its net into the pin it lands on */
+  let best=null;
+  comps.forEach(c=>{ if(!showSide[c.side])return; const z=pinZone(c,w);
+    if(z&&(!best||z.d<best.z.d)) best={c,z}; });
+  if(!best)return false;
+  best.c[best.z.key]=net;
+  if(best.c.id===selComp) renderProps();
+  return true;
 }
 function addComp(m){
   if(!mmScale) return;
@@ -895,7 +907,7 @@ function syncComps(){
   $('compSize').value=compSize; $('compSide').value=compSide;
   $('compPick').disabled=!mmScale;
   $('compPick').classList.toggle('on',clickMode==='comp');
-  $('compPick').textContent=clickMode==='comp'?'Завершить установку':'Режим установки';
+  $('compPick').textContent='Редактирование компонентов (K)';
   $('calBtn').classList.toggle('on',clickMode==='calib');
   $('calBtn').textContent=clickMode==='calib'?'Идёт калибровка':'Калибровать';
   $('calDone').disabled=clickMode!=='calib';
@@ -1123,12 +1135,12 @@ function sync(){
 
   const netting=clickMode==='net', an=nets.find(n=>n.id===activeNet);
   $('netPickBtn').classList.toggle('on',netting);
-  $('netPickBtn').textContent=netting?'Завершить ввод точек':'Ставить точки нета';
+  $('netPickBtn').textContent='Редактирование нетов (N)';
   $('delPoint').disabled=!selPoint; $('clearNetPts').disabled=!an||!points.some(p=>p.net===activeNet);
   $('labelsBtn').classList.toggle('on',labels);
   $('netStatus').innerHTML= !an? 'Создайте нет, затем ставьте его точки на слоях.'
     : `Активный нет: <b>${an.name}</b> · точек ${points.filter(p=>p.net===activeNet).length}<br>`+
-      `Точки ставятся на слой <b>${s?s.name:'—'}</b>. Правый клик по точке — удалить.`+
+      `Точки ставятся на слой <b>${s?s.name:'—'}</b>.`+(netting?' Правый клик / Delete по точке — удалить.':'')+
       (hlNet?`<br><span class="good">подсвечен: ${nets.find(n=>n.id===hlNet).name}</span>`:'');
 
   const cue=$('hudCue');
@@ -1319,7 +1331,7 @@ vp.addEventListener('pointerup',e=>{
     else addComp(m);
     drawMarks(); syncComps(); return;
   }
-  {
+  if(clickMode==='none'){
     const hc=hitComp(m);
     if(hc){ selComp=hc.id; renderComps(); drawMarks(); syncComps(); return; }
   }
@@ -1337,6 +1349,7 @@ vp.addEventListener('pointerup',e=>{
     else if(activeNet){
       points.push({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
         net:activeNet, layer:s.id, p:imgOf(s,m)});
+      pinFromPoint(m,activeNet);
       selPoint=null; renderNets();
     }
     sync(); drawMarks(); save(); return;
@@ -1344,13 +1357,13 @@ vp.addEventListener('pointerup',e=>{
   const hit=hitPoint(m);
   if(hit){ hlNet=hit.net; activeNet=hit.net; selPoint=hit.id; renderNets(); sync(); drawMarks(); }
 });
-vp.addEventListener('contextmenu',e=>{
+vp.addEventListener('contextmenu',e=>{ /* delete only in the matching edit mode */
+  if(clickMode==='comp'||clickMode==='net') e.preventDefault();
   const mm=worldFromEvent(e);
-  const hc=hitComp(mm);
+  const hc=clickMode==='comp'&&hitComp(mm);
   if(hc){ e.preventDefault(); comps=comps.filter(o=>o.id!==hc.id);
     if(selComp===hc.id)selComp=null; renderComps(); drawMarks(); save(); return; }
-  const hit=hitPoint(mm); if(!hit)return;
-  e.preventDefault();
+  const hit=clickMode==='net'&&hitPoint(mm); if(!hit)return;
   points=points.filter(p=>p.id!==hit.id);
   if(selPoint===hit.id)selPoint=null;
   renderNets();drawMarks();sync();save();
@@ -1495,8 +1508,8 @@ addEventListener('keydown',e=>{
     case 'p':case 'P':case 'з':case 'З':$('pickBtn').click();return;
     case 'n':case 'N':case 'т':case 'Т':$('netPickBtn').click();return;
     case 'Delete':
-      if(selComp){comps=comps.filter(o=>o.id!==selComp);selComp=null;renderComps();drawMarks();save();}
-      else if(selPoint)$('delPoint').click();
+      if(clickMode==='comp'&&selComp){comps=comps.filter(o=>o.id!==selComp);selComp=null;renderComps();drawMarks();save();}
+      else if(clickMode==='net'&&selPoint)$('delPoint').click();
       return;
     case 'k':case 'K':case 'л':case 'Л':if(!$('compPick').disabled)$('compPick').click();return;
     case 'm':case 'M':case 'ь':case 'Ь':if(!$('moveBtn').disabled)$('moveBtn').click();return;
