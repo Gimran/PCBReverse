@@ -251,6 +251,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>M</b> — сдвиг слоя мышью и стрелками<br><b>F</b> — переворот платы<br>
             <b>[ ]</b> — поворот 0.1° · <b>Shift</b> — ×10<br>
             <b>P</b> — опорные точки · <b>N</b> — редактирование нетов · <b>K</b> — редактирование компонентов<br>
+            <b>Alt+клик</b> в режиме N — переходное отверстие (точка на обеих сторонах)<br>
             <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> / <b>Delete</b> — удалить (только в режимах N / K) · <b>Esc</b> — выход
           </div>
         </div>
@@ -585,6 +586,8 @@ function fitTransform(src,dst,opt){
 
 /* ---------- render ---------- */
 /* layer shown by eye/side/view mode (α not counted) — net points follow this */
+/* net point visibility: a via (multi-layer point) shows on both sides whatever the layer filter */
+const ptShown=(pt,lay)=>!!pt.via||layerShown(lay);
 function layerShown(l){
   if(!l.on||!onSide(l)) return false;
   if(viewMode==='solo') return l.id===sel;
@@ -680,17 +683,18 @@ function drawMarks(){
   if(pending&&byId(refId)) cross(screenOf(worldOf(byId(refId),pending)),6,.8);
   points.forEach(pt=>{
     const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
-    if(!net||!net.on||!lay||!layerShown(lay)) return;
+    if(!net||!net.on||!lay||!ptShown(pt,lay)) return;
     const p=screenOf(worldOf(lay,pt.p));
     const hot=hlNet===null||hlNet===net.id, op=hot?1:.28;
-    ring(p,net.color,hot&&hlNet!==null?9:6,hot&&hlNet!==null?2.2:1.5,op);
+    if(pt.via) ring(p,net.color,hot&&hlNet!==null?6.5:5,hot&&hlNet!==null?4:3.2,op); /* via: thick annular pad */
+    else ring(p,net.color,hot&&hlNet!==null?9:6,hot&&hlNet!==null?2.2:1.5,op);
     dot(p,net.color,op);
     if(pt.id===selPoint) ring(p,cssVar('--text')||'#fff',12,1,.9);
     if(hlNet!==null&&hlNet===net.id){
       marks.appendChild(svg('line',{x1:p.x-13,y1:p.y,x2:p.x-7,y2:p.y,stroke:net.color,'stroke-width':1.4}));
       marks.appendChild(svg('line',{x1:p.x+7,y1:p.y,x2:p.x+13,y2:p.y,stroke:net.color,'stroke-width':1.4}));
     }
-    if(labels) txt(p,net.color,net.name+' ·'+lay.id.slice(1),op);
+    if(labels) txt(p,net.color,net.name+(pt.via?' ·via':' ·'+lay.id.slice(1)),op);
   });
   drawComps();
 }
@@ -804,7 +808,7 @@ function pinZone(c,w){ /* world point -> {key:'n1'|'n2', d: distance to pad cent
 function autoPins(c){
   const best={n1:null,n2:null};
   points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
-    if(!net||!net.on||!lay||!layerShown(lay))return;
+    if(!net||!net.on||!lay||!ptShown(pt,lay))return;
     const z=pinZone(c,worldOf(lay,pt.p)); if(!z)return;
     const key=z.key, d=z.d, pri=lay.id===sel?0:1;
     const b=best[key]; if(!b||pri<b.pri||(pri===b.pri&&d<b.d)) best[key]={net:net.id,pri,d};
@@ -816,9 +820,9 @@ function autoPins(c){
     if(best[k2]&&!best[o]&&c[o]===best[k2].net){ c[o]=null; ch=true; } });
   return ch;
 }
-function pinFromPoint(w,net){ /* new net point: write its net into the pin it lands on */
+function pinFromPoint(w,net,via){ /* new net point: write its net into the pin it lands on (via: either side) */
   let best=null;
-  comps.forEach(c=>{ if(!showSide[c.side])return; const z=pinZone(c,w);
+  comps.forEach(c=>{ if(!via&&!showSide[c.side])return; const z=pinZone(c,w);
     if(z&&(!best||z.d<best.z.d)) best={c,z}; });
   if(!best)return false;
   best.c[best.z.key]=net;
@@ -1099,7 +1103,7 @@ function addNet(){
 function hitPoint(m){
   let best=null,bd=12/Math.abs(view.z);
   points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
-    if(!net||!net.on||!lay||!layerShown(lay))return;
+    if(!net||!net.on||!lay||!ptShown(pt,lay))return;
     const w=worldOf(lay,pt.p), d=Math.hypot(w.x-m.x,w.y-m.y);
     if(d<bd){bd=d;best=pt;} });
   return best;
@@ -1172,12 +1176,12 @@ function sync(){
   $('labelsBtn').classList.toggle('on',labels);
   $('netStatus').innerHTML= !an? 'Создайте нет, затем ставьте его точки на слоях.'
     : `Активный нет: <b>${an.name}</b> · точек ${points.filter(p=>p.net===activeNet).length}<br>`+
-      `Точки ставятся на слой <b>${s?s.name:'—'}</b>.`+(netting?' Правый клик / Delete по точке — удалить.':'')+
+      `Точки ставятся на слой <b>${s?s.name:'—'}</b>.`+(netting?' <b>Alt+клик</b> — переходное (видно с обеих сторон). Правый клик / Delete по точке — удалить.':'')+
       (hlNet?`<br><span class="good">подсвечен: ${nets.find(n=>n.id===hlNet).name}</span>`:'');
 
   const cue=$('hudCue');
   if(picking){cue.hidden=false;cue.textContent=`точка ${np+1}: клик по «${nextName}»`;}
-  else if(netting&&an){cue.hidden=false;cue.textContent=`${an.name}: клик ставит точку на «${s?s.name:'—'}»`;}
+  else if(netting&&an){cue.hidden=false;cue.textContent=`${an.name}: клик ставит точку на «${s?s.name:'—'}» · Alt+клик — переходное`;}
   else cue.hidden=true;
   vp.classList.toggle('picking',clickMode!=='none');
   $('moveBtn').classList.toggle('on',clickMode==='move');
@@ -1536,9 +1540,10 @@ vp.addEventListener('pointerup',e=>{
     const hit=hitPoint(m);
     if(hit){ selPoint=hit.id; activeNet=hit.net; hlNet=hit.net; renderNets(); }
     else if(activeNet){
+      const via=e.altKey; /* Alt+click: via, shown on both sides */
       points.push({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-        net:activeNet, layer:s.id, p:imgOf(s,m)});
-      pinFromPoint(m,activeNet);
+        net:activeNet, layer:s.id, p:imgOf(s,m), ...(via?{via:true}:{})});
+      pinFromPoint(m,activeNet,via);
       selPoint=null; renderNets();
     }
     sync(); drawMarks(); save(); return;
