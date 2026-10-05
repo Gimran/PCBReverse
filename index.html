@@ -90,7 +90,7 @@ svg.marks{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visi
 @media (max-width:880px){ .panel{border-left:0;border-top:1px solid var(--line)} }
 .phead{padding:13px 16px 11px;border-bottom:1px solid var(--line)}
 .tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
-.lpanel .tabs{grid-template-columns:repeat(2,1fr)}
+.lpanel .tabs{grid-template-columns:repeat(4,1fr) 30px}
 .tabs button{border:0;border-radius:0;background:transparent;box-shadow:none;padding:9px 4px;
   font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.05em;color:var(--muted);
   border-bottom:2px solid transparent}
@@ -193,11 +193,14 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 <div class="app">
   <div class="lpanel">
     <div class="tabs">
-      <button class="on" data-ltab="align">ВИД И СОВМЕЩЕНИЕ</button>
-      <button data-ltab="comp">КОМПОНЕНТЫ</button>
+      <button class="on" data-ltab="view" title="вид отображения">ВИД</button>
+      <button data-ltab="layer" title="активный слой: выравнивание, удаление фона">СЛОЙ</button>
+      <button data-ltab="warp" title="деформация по опорным точкам">ДЕФОРМ</button>
+      <button data-ltab="comp" title="компоненты">КОМП</button>
+      <button data-ltab="keys" title="клавиши">?</button>
     </div>
     <div class="pages">
-      <div data-lpage="align">
+      <div data-lpage="view">
         <div class="sect">
           <div class="lbl">Вид отображения</div>
           <div class="row">
@@ -223,6 +226,8 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           </div>
           <button class="mini wide" id="invBtn">инверсия цветов</button>
         </div>
+      </div>
+      <div data-lpage="layer" hidden>
         <div class="sect">
           <div class="lbl">Выравнивание активного слоя</div>
           <div class="row"><span class="lbl" style="flex:none;width:40px">угол</span>
@@ -234,6 +239,20 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <button class="mini wide" id="moveBtn">Двигать слой мышью (M)</button>
           <button class="mini wide" id="rstLayer">сброс слоя</button>
         </div>
+        <div class="sect">
+          <div class="lbl">Удаление фона</div>
+          <div class="row">
+            <button class="mini" id="keyOn" style="flex:1" title="сделать прозрачным цвет фона активного слоя">удалить фон</button>
+            <input type="color" id="keyCol" value="#ffffff" title="цвет фона">
+            <button class="mini" id="keyPick" title="пипетка: взять цвет с экрана">пипетка</button>
+          </div>
+          <div class="row"><span class="lbl" style="flex:none;width:40px">допуск</span>
+            <input type="range" id="keyTol" min="0" max="100" step="1" value="15">
+            <span class="val" id="keyTolv">15%</span></div>
+          <div class="status">Для наложения пинаутов из документации: фон картинки становится прозрачным.</div>
+        </div>
+      </div>
+      <div data-lpage="warp" hidden>
         <div class="sect">
           <div class="lbl">Деформация по опорным точкам</div>
           <div class="modes two"><button class="mini" id="pickBtn">Задать точки</button>
@@ -251,7 +270,8 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="dropWarp" disabled>Снять деформацию</button>
           </div>
         </div>
-
+      </div>
+      <div data-lpage="keys" hidden>
         <div class="sect">
           <div class="keys">
             <b>1…8</b> — видимость слоя · <b>X</b> — следующий слой<br>
@@ -457,7 +477,7 @@ function mkLayer(i,init){
     id, name:'Слой '+(i+1), color:LAYPAL[i%LAYPAL.length], side:'any',
     src:'', stored:false, ok:false,
     x:0,y:0,rot:0,scale:1,fh:false,fv:false,op:1,on:true,H:null,
-    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal',
+    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15,
     w:1200,h:1200, pairs:[]
   },init||{});
   const clip=document.createElement('div'); clip.className='clip'; clip.dataset.id=id;
@@ -475,20 +495,28 @@ function mkLayer(i,init){
   f.id='tf_'+id; f.setAttribute('x','0'); f.setAttribute('y','0');
   f.setAttribute('width','100%'); f.setAttribute('height','100%');
   f.setAttribute('color-interpolation-filters','sRGB');
+  /* colour key: alpha = clamp((Σ|c-key| - tol)/soft); |x| = (x)+ + (-x)+ from two clamped colour matrices */
+  const fe=(tag,a)=>{ const n=document.createElementNS(SVGNS,tag); for(const k in a) n.setAttribute(k,a[k]); return n; };
+  const kp=fe('feColorMatrix',{in:'SourceGraphic',type:'matrix',result:'kp'});
+  const km=fe('feColorMatrix',{in:'SourceGraphic',type:'matrix',result:'km'});
+  const kd=fe('feComposite',{in:'kp',in2:'km',operator:'arithmetic',k1:0,k2:1,k3:1,k4:0,result:'kd'});
+  const ka=fe('feColorMatrix',{in:'kd',type:'matrix',result:'ka'});
+  const ks=fe('feComposite',{in:'SourceGraphic',in2:'ka',operator:'in',result:'src'});
+  f.append(kp,km,kd,ka,ks);
   const flood=document.createElementNS(SVGNS,'feFlood');
   flood.setAttribute('flood-color',l.tc); flood.setAttribute('result','f');
   const c1=document.createElementNS(SVGNS,'feComposite');
-  c1.setAttribute('in','f'); c1.setAttribute('in2','SourceGraphic');
+  c1.setAttribute('in','f'); c1.setAttribute('in2','src');
   c1.setAttribute('operator','in'); c1.setAttribute('result','t');
   const bl=document.createElementNS(SVGNS,'feBlend');
-  bl.setAttribute('in','t'); bl.setAttribute('in2','SourceGraphic');
+  bl.setAttribute('in','t'); bl.setAttribute('in2','src');
   bl.setAttribute('mode',tintMode); bl.setAttribute('result','b');
   const c2=document.createElementNS(SVGNS,'feComposite');
-  c2.setAttribute('in','b'); c2.setAttribute('in2','SourceGraphic');
+  c2.setAttribute('in','b'); c2.setAttribute('in2','src');
   c2.setAttribute('operator','arithmetic');
   c2.setAttribute('k1','0'); c2.setAttribute('k2','0'); c2.setAttribute('k3','1'); c2.setAttribute('k4','0');
   f.append(flood,c1,bl,c2); defs.appendChild(f);
-  l.fx={flood,bl,c2,node:f};
+  l.fx={flood,bl,c2,kp,km,ka,node:f};
   return l;
 }
 function restack(){
@@ -610,7 +638,13 @@ function applyTint(l){
   l.fx.bl.setAttribute('mode',l.tm||tintMode);
   l.fx.c2.setAttribute('k2',a.toFixed(3));
   l.fx.c2.setAttribute('k3',(1-a).toFixed(3));
-  l.el.style.filter = a>0 ? `url(#tf_${l.id})` : 'none';
+  const h=l.kc.replace('#',''), k=[0,2,4].map(i=>parseInt(h.substr(i,2),16)/255||0);
+  const t=l.kt*1.5, soft=.06, g=1/soft;
+  l.fx.kp.setAttribute('values',`1 0 0 0 ${-k[0]} 0 1 0 0 ${-k[1]} 0 0 1 0 ${-k[2]} 0 0 0 0 1`);
+  l.fx.km.setAttribute('values',`-1 0 0 0 ${k[0]} 0 -1 0 0 ${k[1]} 0 0 -1 0 ${k[2]} 0 0 0 0 1`);
+  l.fx.ka.setAttribute('values', l.kOn ? `0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${g} ${g} ${g} 0 ${-t*g}`
+                                       : '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1');
+  l.el.style.filter = (a>0||l.kOn) ? `url(#tf_${l.id})` : 'none';
 }
 function applyLayer(l){
   if(l.H){
@@ -1228,6 +1262,10 @@ function sync(){
   if(document.activeElement!==$('imgDir')) $('imgDir').value=imgDir;
   $('flipBoard').textContent='Плата: '+(boardSide==='top'?'TOP':'BOT')+' · перевернуть (F)';
   $('xrayBtn').classList.toggle('on',xray);
+  { const l=sel_(); ['keyOn','keyCol','keyPick','keyTol'].forEach(i=>$(i).disabled=!l);
+    if(l){ $('keyOn').classList.toggle('on',!!l.kOn); $('keyCol').value=l.kc;
+      $('keyTol').value=Math.round(l.kt*100); $('keyTolv').textContent=Math.round(l.kt*100)+'%'; }
+    $('keyPick').hidden=!window.EyeDropper; }
   $('showNetsBtn').classList.toggle('on',showNets); $('showCompsBtn').classList.toggle('on',showComps);
   if(clickMode!=='move') vp.style.cursor='';
   $('vrotv').textContent=view.rot+'°';
@@ -1244,7 +1282,7 @@ function snapshot(){
     inverted, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.color,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
-      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs})),
+      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt})),
     nets, points, activeNet, netSeq,
     comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
 }
@@ -1263,7 +1301,8 @@ function restore(s){
     fh:!!d.fh,fv:!!d.fv,op:typeof d.op==='number'?d.op:1,on:d.on!==false,H:d.H||null,
     tc:d.tc||LAYPAL[i%LAYPAL.length], tn:typeof d.tn==='number'?d.tn:0,
     tm:d.tm||s.tintMode||'color',
-    blend:d.blend||'normal', pairs:Array.isArray(d.pairs)?d.pairs:[]});
+    blend:d.blend||'normal', pairs:Array.isArray(d.pairs)?d.pairs:[],
+    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15});
     layers.push(l); });
   restack();
   sel=byId(s.sel)?s.sel:layers[layers.length-1].id;
@@ -1716,6 +1755,11 @@ $('showBot').onclick=()=>{showSide.bot=!showSide.bot;renderComps();drawMarks();s
 $('addNet').onclick=addNet;
 $('netPickBtn').onclick=()=>{ if(!nets.length)addNet();
   clickMode=clickMode==='net'?'none':'net'; if(clickMode==='net')showNets=true; sync();drawMarks()};
+$('keyOn').onclick=()=>{ const l=sel_(); if(!l)return; l.kOn=!l.kOn; applyLayer(l); sync(); };
+$('keyCol').oninput=e=>{ const l=sel_(); if(!l)return; l.kc=e.target.value; l.kOn=true; applyLayer(l); sync(); };
+$('keyTol').oninput=e=>{ const l=sel_(); if(!l)return; l.kt=+e.target.value/100; applyLayer(l); sync(); };
+$('keyPick').onclick=async()=>{ const l=sel_(); if(!l||!window.EyeDropper)return;
+  try{ const r=await new EyeDropper().open(); l.kc=r.sRGBHex; l.kOn=true; applyLayer(l); sync(); }catch(err){} };
 $('showNetsBtn').onclick=()=>{showNets=!showNets;sync();drawMarks();save()};
 $('showCompsBtn').onclick=()=>{showComps=!showComps;sync();drawMarks();save()};
 $('delPoint').onclick=()=>{points=points.filter(p=>p.id!==selPoint);selPoint=null;renderNets();drawMarks();sync();save()};
