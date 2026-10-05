@@ -250,9 +250,6 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="rstLayer">сброс слоя</button>
             <button class="mini" id="rstCrop">сброс кропа</button>
           </div>
-          <div class="row" title="размытие краёв слоя (внутри кропа) — заплатки без резкой рамки">
-            <span class="lbl" style="flex:none;width:40px">края</span>
-            <input type="range" id="feR" min="0" max="50" step="1" value="0"><span class="val" id="feV">0%</span></div>
         </div>
         <div class="sect">
           <div class="lbl">Удаление фона</div>
@@ -1396,7 +1393,14 @@ function renderVideo(){
     const b2=document.createElement('button'); b2.className='mini'; b2.textContent='Снимок в слой';
     b2.title='текущий кадр — отдельным слоем-картинкой на том же месте'; b2.disabled=!live; b2.onclick=()=>snapLayer(l);
     btns.append(b1,b3,b4,b2);
-    row.append(cap,cs,st,ra,rf,fl,btns); box.appendChild(row);
+    const md=document.createElement('div'); md.className='modes two';
+    [['move','Ручная деформация (M)','рамка: масштаб / вращение (клик по слою переключает), ⊕ — центр'],
+     ['crop','Кроп','участок кадра для снимка; края размываются внутри кропа']].forEach(([m,tx,tt])=>{
+      const b=document.createElement('button'); b.className='mini'; b.textContent=tx; b.title=tt;
+      b.dataset.mode=m; b.dataset.lid=l.id; b.disabled=m==='move'&&!!l.H;
+      if(clickMode===m&&sel===l.id) b.classList.add('on');
+      b.onclick=()=>videoMode(l,m); md.appendChild(b); });
+    row.append(cap,cs,st,ra,rf,fl,md,btns); box.appendChild(row);
   });
 }
 
@@ -1526,8 +1530,8 @@ function sync(){
   $('moveBtn').classList.toggle('on',clickMode==='move');
   $('cropBtn').classList.toggle('on',clickMode==='crop'); $('cropBtn').disabled=!sel_();
   $('rstCrop').disabled=!(sel_()&&sel_().crop);
-  { const l=sel_(); $('feR').disabled=!l; if(l){ if(document.activeElement!==$('feR')) $('feR').value=Math.round((l.fe||0)*100);
-      $('feV').textContent=Math.round((l.fe||0)*100)+'%'; } }
+  document.querySelectorAll('#vidRows [data-mode]').forEach(b=>  /* ВИДЕО tab copies of M / crop */
+    b.classList.toggle('on',clickMode===b.dataset.mode&&sel===b.dataset.lid));
   $('moveBtn').disabled=!!(sel_()&&sel_().H);
   $('gridBtn').classList.toggle('on',grid); vp.classList.toggle('nogrid',!grid);
   $('invBtn').classList.toggle('on',inverted);
@@ -1968,7 +1972,14 @@ document.querySelectorAll('[data-ltab]').forEach(b=>b.onclick=()=>{
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('[data-page]').forEach(p=>p.hidden=p.dataset.page!==b.dataset.tab);
+  if(b.dataset.tab==='video'){ const v=layers.find(l=>l.kind==='video'); if(v) videoMode(v,'move',true); }
 });
+function videoMode(l,mode,force){ /* make the video layer active and toggle M / crop on it */
+  sel=l.id; if(refId===sel) refId=(layers.find(x=>x.id!==sel)||l).id;
+  if(mode==='move'&&l.H) mode='crop';
+  clickMode=(!force&&clickMode===mode)?'none':mode; pending=null; calib=null;
+  renderCards(); renderVideo(); applyAll(); sync(); syncComps(); drawMarks();
+}
 document.querySelectorAll('[data-vm]').forEach(b=>b.onclick=()=>{
   viewMode=b.dataset.vm; applyAll(); sync(); save();
 });
@@ -1995,7 +2006,6 @@ $('rstLayer').onclick=()=>{const s=sel_(); if(!s)return;
   s.x=s.y=s.rot=0;s.scale=1;s.H=null;warpInfo='';applyLayer(s);renderCards();sync()};
 $('cropBtn').onclick=()=>{ clickMode=clickMode==='crop'?'none':'crop';
   if(clickMode==='crop'){pending=null;calib=null;} sync();syncComps();drawMarks(); };
-$('feR').oninput=e=>{ const l=sel_(); if(!l)return; l.fe=+e.target.value/100; $('feV').textContent=e.target.value+'%'; applyLayer(l); };
 $('rstCrop').onclick=()=>{ const s=sel_(); if(!s)return; s.crop=null; applyLayer(s); sync(); };
 $('moveBtn').onclick=()=>{ clickMode=clickMode==='move'?'none':'move';
   if(clickMode==='move'){pending=null;calib=null;} sync();syncComps();drawMarks(); };
