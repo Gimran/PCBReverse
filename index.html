@@ -421,6 +421,7 @@ const PKG={ '0201':{L:0.60,W:0.30,T:0.15}, '0402':{L:1.00,W:0.50,T:0.25},
 const SIDECOL={top:'#e8b04b', bot:'#59a7d8'};
 let comps=[], selComp=null, mmScale=0, compSeq={R:1,C:1};
 let compKind='R', compSize='0603', compSide='top', compRot=0;
+let compVal={R:'',C:''}; /* last typed value per kind — default for new parts */
 let showSide={top:true,bot:true};
 let calib=null;   /* {size,x,y} while calibrating */
 let browseTarget=null, booted=false, imgDir='pcb_overlay_img/';
@@ -802,7 +803,7 @@ function addComp(m){
   if(!mmScale) return;
   const kind=compKind, des=kind+(compSeq[kind]++);
   const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-    kind, size:compSize, side:compSide, x:m.x, y:m.y, rot:compRot, des, val:'', n1:null, n2:null};
+    kind, size:compSize, side:compSide, x:m.x, y:m.y, rot:compRot, des, val:compVal[kind]||'', n1:null, n2:null};
   autoPins(c); comps.push(c); selComp=c.id; renderComps(); drawMarks(); save();
 }
 function renderComps(){
@@ -839,7 +840,7 @@ function renderProps(){
   des.oninput=()=>{c.des=des.value;renderComps0();drawMarks();save()};
   mkRow('designator',des);
   const val=document.createElement('input'); val.type='text'; val.value=c.val; val.placeholder='10k / 100n';
-  val.oninput=()=>{c.val=val.value;renderComps0();drawMarks();save()};
+  val.oninput=()=>{c.val=val.value;compVal[c.kind]=c.val;renderComps0();drawMarks();save()};
   mkRow('value',val);
   const sz=document.createElement('select'); sz.className='slim';
   Object.keys(PKG).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sz.appendChild(o)});
@@ -1160,7 +1161,7 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, showSide, warpModel, imgDir};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, showSide, warpModel, imgDir};
 }
 function save(){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
@@ -1191,6 +1192,7 @@ function restore(s){
   comps=Array.isArray(s.comps)?s.comps:[]; mmScale=+s.mmScale||0;
   compSeq=s.compSeq||{R:1,C:1}; compKind=s.compKind||'R'; compSize=s.compSize||'0603';
   compSide=s.compSide||'top'; compRot=+s.compRot||0;
+  compVal=Object.assign({R:'',C:''},s.compVal||{});
   showSide=Object.assign({top:true,bot:true},s.showSide||{});
   selComp=null; calib=null; warpModel=s.warpModel==='persp'?'persp':'affine';
   imgDir=typeof s.imgDir==='string'?s.imgDir:'pcb_overlay_img/';
