@@ -115,6 +115,9 @@ button.wide{width:100%}
 .layer{border:1px solid var(--line);border-radius:5px;background:var(--panel-2);overflow:hidden}
 .layer.sel{border-color:var(--text);box-shadow:inset 3px 0 0 var(--text)}
 .layer.off{opacity:.5}
+.lsep{display:flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:10px;
+  letter-spacing:.08em;color:var(--muted);margin:2px 0 -2px}
+.lsep::before,.lsep::after{content:"";flex:1;border-top:1px solid var(--line)}
 .lhead{display:flex;align-items:center;gap:5px;padding:5px 6px 4px;cursor:pointer}
 .layer{cursor:pointer}
 .lhead .lname{flex:1;min-width:0;padding:2px 3px;font-size:13px}
@@ -250,6 +253,15 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <input type="range" id="keyTol" min="0" max="100" step="1" value="15">
             <span class="val" id="keyTolv">15%</span></div>
           <div class="status">Для наложения пинаутов из документации: фон картинки становится прозрачным.</div>
+        </div>
+        <div class="sect">
+          <div class="lbl">Коррекция цвета</div>
+          <div id="corBox" style="display:flex;flex-direction:column;gap:6px"></div>
+          <div class="modes three">
+            <button class="mini" id="corText" title="Ч/Б, контраст, резкость — читаемость подписей">подписи</button>
+            <button class="mini" id="corThr" title="Ч/Б в два уровня — только тёмное/светлое">порог Ч/Б</button>
+            <button class="mini" id="corReset">сброс</button>
+          </div>
         </div>
       </div>
       <div data-lpage="warp" hidden>
@@ -442,6 +454,17 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 "use strict";
 const SVGNS="http://www.w3.org/2000/svg", KEY="pcb-overlay-v4", IMGKEY=id=>"pcb-overlay-img-"+id;
 const NETPAL=["#e05c5c","#e0a844","#57b85d","#68b6dd","#b07ede","#e0d24a","#4ac4b0","#e08ac0"];
+/* colour correction per layer: brightness, contrast, gamma, levels black/white, saturation, sharpen, posterize */
+const COR0={br:0,ct:1,gm:1,lb:0,lw:1,sat:1,sh:0,pz:0};
+const CORUI=[['lb','чёрн',0,1,.005,v=>Math.round(v*100)+'%','уровни: всё темнее — в чёрный'],
+  ['lw','бел',0,1,.005,v=>Math.round(v*100)+'%','уровни: всё светлее — в белый'],
+  ['gm','гамма',.2,4,.01,v=>v.toFixed(2),'гамма: >1 высветляет средние тона'],
+  ['br','ярк',-1,1,.01,v=>(v>0?'+':'')+Math.round(v*100)+'%','яркость'],
+  ['ct','контр',0,4,.01,v=>v.toFixed(2)+'×','контраст'],
+  ['sat','насыщ',0,2,.01,v=>Math.round(v*100)+'%','насыщенность: 0 — Ч/Б'],
+  ['sh','резк',0,3,.05,v=>v.toFixed(2),'резкость'],
+  ['pz','постер',0,16,1,v=>v<2?'выкл':String(v),'постеризация: число уровней на канал']];
+const corActive=c=>Object.keys(COR0).some(k=>Math.abs(c[k]-COR0[k])>1e-9);
 const LAYPAL=["#e0a844","#68b6dd","#57b85d","#e05c5c","#b07ede","#4ac4b0","#e08ac0","#c9c35a"];
 const $=id=>document.getElementById(id);
 const vp=$('vp'), stack=$('stack'), handle=$('handle'), marks=$('marks'), defs=$('filterDefs');
@@ -477,7 +500,7 @@ function mkLayer(i,init){
     id, name:'Слой '+(i+1), color:LAYPAL[i%LAYPAL.length], side:'any',
     src:'', stored:false, ok:false,
     x:0,y:0,rot:0,scale:1,fh:false,fv:false,op:1,on:true,H:null,
-    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15,
+    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15, cor:{...COR0},
     w:1200,h:1200, pairs:[]
   },init||{});
   const clip=document.createElement('div'); clip.className='clip'; clip.dataset.id=id;
@@ -501,8 +524,16 @@ function mkLayer(i,init){
   const km=fe('feColorMatrix',{in:'SourceGraphic',type:'matrix',result:'km'});
   const kd=fe('feComposite',{in:'kp',in2:'km',operator:'arithmetic',k1:0,k2:1,k3:1,k4:0,result:'kd'});
   const ka=fe('feColorMatrix',{in:'kd',type:'matrix',result:'ka'});
-  const ks=fe('feComposite',{in:'SourceGraphic',in2:'ka',operator:'in',result:'src'});
+  const ks=fe('feComposite',{in:'SourceGraphic',in2:'ka',operator:'in',result:'k0'});
   f.append(kp,km,kd,ka,ks);
+  const ctf=(inp,res)=>{ const n=fe('feComponentTransfer',{in:inp,result:res});
+    const fs=['R','G','B'].map(ch=>{ const x=document.createElementNS(SVGNS,'feFunc'+ch); n.appendChild(x); return x; });
+    f.appendChild(n); return fs; };
+  const shp=fe('feConvolveMatrix',{in:'k0',order:3,kernelMatrix:'0 0 0 0 1 0 0 0 0',preserveAlpha:'true',result:'c0'});
+  f.appendChild(shp);
+  const lv=ctf('c0','c1'), gmf=ctf('c1','c2'), ctr=ctf('c2','c3');
+  const sat=fe('feColorMatrix',{in:'c3',type:'saturate',values:1,result:'c4'}); f.appendChild(sat);
+  const pzf=ctf('c4','src');
   const flood=document.createElementNS(SVGNS,'feFlood');
   flood.setAttribute('flood-color',l.tc); flood.setAttribute('result','f');
   const c1=document.createElementNS(SVGNS,'feComposite');
@@ -516,16 +547,21 @@ function mkLayer(i,init){
   c2.setAttribute('operator','arithmetic');
   c2.setAttribute('k1','0'); c2.setAttribute('k2','0'); c2.setAttribute('k3','1'); c2.setAttribute('k4','0');
   f.append(flood,c1,bl,c2); defs.appendChild(f);
-  l.fx={flood,bl,c2,kp,km,ka,node:f};
+  l.fx={flood,bl,c2,kp,km,ka,shp,lv,gmf,ctr,sat,pzf,node:f};
   return l;
 }
+/* stack order by label group (index 0 = bottom): обе, BOT, TOP; order inside a group is kept */
+const SIDE_RANK={any:0,bot:1,top:2};
+const grp=l=>SIDE_RANK[l.side]??0;
 function restack(){
+  layers=layers.map((l,i)=>[l,i]).sort((a,b)=>grp(a[0])-grp(b[0])||a[1]-b[1]).map(x=>x[0]);
   layers.forEach((l,i)=>{ l.clip.style.zIndex=i+1; stack.appendChild(l.clip); });
 }
 function setCount(n){
   n=Math.max(2,Math.min(8,n|0));
-  while(layers.length>n){
-    const l=layers.pop();
+  while(layers.length>n){ /* drop the most recently added layer (highest L-number), not the top of the stack */
+    const num=x=>parseInt(x.id.slice(1),10)||0;
+    const l=layers.reduce((a,b)=>num(b)>num(a)?b:a); layers=layers.filter(x=>x!==l);
     points=points.filter(p=>p.layer!==l.id);
     layers.forEach(o=>o.pairs=o.pairs.filter(pr=>pr.rl!==l.id));
     localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{});
@@ -644,7 +680,21 @@ function applyTint(l){
   l.fx.km.setAttribute('values',`-1 0 0 0 ${k[0]} 0 -1 0 0 ${k[1]} 0 0 -1 0 ${k[2]} 0 0 0 0 1`);
   l.fx.ka.setAttribute('values', l.kOn ? `0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${g} ${g} ${g} 0 ${-t*g}`
                                        : '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1');
-  l.el.style.filter = (a>0||l.kOn) ? `url(#tf_${l.id})` : 'none';
+  applyCor(l);
+  l.el.style.filter = (a>0||l.kOn||corActive(l.cor)) ? `url(#tf_${l.id})` : 'none';
+}
+function applyCor(l){
+  const c=l.cor, set=(fs,a)=>fs.forEach(x=>{ for(const k in a) x.setAttribute(k,a[k]); });
+  const sh=c.sh;
+  l.fx.shp.setAttribute('kernelMatrix',`0 ${-sh} 0 ${-sh} ${1+4*sh} ${-sh} 0 ${-sh} 0`);
+  const ls=1/Math.max(.01,c.lw-c.lb);
+  set(l.fx.lv,{type:'linear',slope:ls,intercept:-c.lb*ls});
+  set(l.fx.gmf,{type:'gamma',amplitude:1,exponent:1/c.gm,offset:0});
+  set(l.fx.ctr,{type:'linear',slope:c.ct,intercept:.5-.5*c.ct+c.br});
+  l.fx.sat.setAttribute('values',c.sat);
+  const n=c.pz|0;
+  if(n>=2) set(l.fx.pzf,{type:'discrete',tableValues:Array.from({length:n},(_,i)=>(i/(n-1)).toFixed(4)).join(' ')});
+  else set(l.fx.pzf,{type:'identity'});
 }
 function applyLayer(l){
   if(l.H){
@@ -1028,8 +1078,11 @@ const BLENDS=[['normal','обычное'],['difference','разность'],['sc
               ['multiply','умножение'],['exclusion','исключение']];
 function renderCards(){
   const box=$('layerCards'); box.innerHTML='';
+  let lastG=null;
   [...layers].reverse().forEach(l=>{
     const i=idx(l.id);
+    if(grp(l)!==lastG){ lastG=grp(l); const sp=document.createElement('div'); sp.className='lsep';
+      sp.textContent=['обе','BOT','TOP'][lastG]; box.appendChild(sp); }
     const card=document.createElement('div');
     card.className='layer'+(l.id===sel?' sel':'')+
       ((l.on && onSide(l))?'':' off');
@@ -1046,12 +1099,12 @@ function renderCards(){
     [['any','обе'],['top','TOP'],['bot','BOT']].forEach(([v,t])=>{
       const o=document.createElement('option'); o.value=v; o.textContent=t; sSel.appendChild(o); });
     sSel.value=l.side||'any';
-    sSel.onchange=()=>{ l.side=sSel.value; renderCards(); applyAll(); sync(); save(); };
+    sSel.onchange=()=>{ l.side=sSel.value; restack(); renderCards(); applyAll(); sync(); save(); };
     const up=document.createElement('button'); up.className='ibtn'; up.textContent='▲'; up.title='выше';
-    up.disabled=i===layers.length-1;
+    up.disabled=i===layers.length-1||grp(layers[i+1])!==grp(l);
     up.onclick=()=>{ layers.splice(i,1); layers.splice(i+1,0,l); restack(); renderCards(); applyAll(); save(); };
     const dn=document.createElement('button'); dn.className='ibtn'; dn.textContent='▼'; dn.title='ниже';
-    dn.disabled=i===0;
+    dn.disabled=i===0||grp(layers[i-1])!==grp(l);
     dn.onclick=()=>{ layers.splice(i,1); layers.splice(i-1,0,l); restack(); renderCards(); applyAll(); save(); };
     const eye=document.createElement('button'); eye.className='ibtn'; eye.textContent=l.on?'●':'○';
     eye.title='видимость';
@@ -1266,6 +1319,7 @@ function sync(){
     if(l){ $('keyOn').classList.toggle('on',!!l.kOn); $('keyCol').value=l.kc;
       $('keyTol').value=Math.round(l.kt*100); $('keyTolv').textContent=Math.round(l.kt*100)+'%'; }
     $('keyPick').hidden=!window.EyeDropper; }
+  syncCor();
   $('showNetsBtn').classList.toggle('on',showNets); $('showCompsBtn').classList.toggle('on',showComps);
   if(clickMode!=='move') vp.style.cursor='';
   $('vrotv').textContent=view.rot+'°';
@@ -1282,7 +1336,7 @@ function snapshot(){
     inverted, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.color,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
-      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt})),
+      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor})),
     nets, points, activeNet, netSeq,
     comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
 }
@@ -1302,7 +1356,7 @@ function restore(s){
     tc:d.tc||LAYPAL[i%LAYPAL.length], tn:typeof d.tn==='number'?d.tn:0,
     tm:d.tm||s.tintMode||'color',
     blend:d.blend||'normal', pairs:Array.isArray(d.pairs)?d.pairs:[],
-    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15});
+    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{})});
     layers.push(l); });
   restack();
   sel=byId(s.sel)?s.sel:layers[layers.length-1].id;
@@ -1755,6 +1809,22 @@ $('showBot').onclick=()=>{showSide.bot=!showSide.bot;renderComps();drawMarks();s
 $('addNet').onclick=addNet;
 $('netPickBtn').onclick=()=>{ if(!nets.length)addNet();
   clickMode=clickMode==='net'?'none':'net'; if(clickMode==='net')showNets=true; sync();drawMarks()};
+CORUI.forEach(([k,lab,mn,mx,st,fmt,tt])=>{
+  const r=document.createElement('div'); r.className='row'; r.title=tt;
+  const l=document.createElement('span'); l.className='lbl'; l.style.flex='none'; l.style.width='44px'; l.textContent=lab;
+  const i=document.createElement('input'); i.type='range'; i.min=mn; i.max=mx; i.step=st; i.id='cor_'+k;
+  const v=document.createElement('span'); v.className='val'; v.id='corv_'+k; v.style.minWidth='38px';
+  i.oninput=()=>{ const s=sel_(); if(!s)return; s.cor[k]=+i.value; v.textContent=fmt(+i.value); applyTint(s); save(); };
+  i.ondblclick=()=>{ const s=sel_(); if(!s)return; s.cor[k]=COR0[k]; applyTint(s); syncCor(); save(); };
+  r.append(l,i,v); $('corBox').appendChild(r); });
+function syncCor(){ const s=sel_();
+  CORUI.forEach(([k,,,,,fmt])=>{ const i=$('cor_'+k); i.disabled=!s; if(!s)return;
+    if(document.activeElement!==i) i.value=s.cor[k]; $('corv_'+k).textContent=fmt(s.cor[k]); });
+  ['corText','corThr','corReset'].forEach(i=>$(i).disabled=!s); }
+const corPreset=a=>{ const s=sel_(); if(!s)return; s.cor={...COR0,...a}; applyTint(s); syncCor(); save(); };
+$('corText').onclick=()=>corPreset({sat:0,ct:1.8,sh:.6});
+$('corThr').onclick=()=>corPreset({sat:0,ct:1.6,pz:2});
+$('corReset').onclick=()=>corPreset({});
 $('keyOn').onclick=()=>{ const l=sel_(); if(!l)return; l.kOn=!l.kOn; applyLayer(l); sync(); };
 $('keyCol').oninput=e=>{ const l=sel_(); if(!l)return; l.kc=e.target.value; l.kOn=true; applyLayer(l); sync(); };
 $('keyTol').oninput=e=>{ const l=sel_(); if(!l)return; l.kt=+e.target.value/100; applyLayer(l); sync(); };
