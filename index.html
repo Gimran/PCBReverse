@@ -1967,9 +1967,21 @@ $('cropBtn').onclick=()=>{ clickMode=clickMode==='crop'?'none':'crop';
 $('rstCrop').onclick=()=>{ const s=sel_(); if(!s)return; s.crop=null; applyLayer(s); sync(); };
 $('moveBtn').onclick=()=>{ clickMode=clickMode==='move'?'none':'move';
   if(clickMode==='move'){pending=null;calib=null;} sync();syncComps();drawMarks(); };
+/* flip keeps a fixed point on screen: the selected via, else the point under the cursor (else the viewport centre) */
+let mouseAt=null;
+vp.addEventListener('pointermove',e=>{ mouseAt={clientX:e.clientX,clientY:e.clientY}; });
+vp.addEventListener('pointerleave',()=>{ mouseAt=null; });
+function flipAnchor(){
+  const pt=points.find(p=>p.id===selPoint), lay=pt&&byId(pt.layer);
+  if(pt&&pt.via&&lay) return worldOf(lay,pt.p);
+  if(mouseAt) return worldFromEvent(mouseAt);
+  const r=vp.getBoundingClientRect(); return worldFromEvent({clientX:r.left+r.width/2,clientY:r.top+r.height/2});
+}
 function flipBoard(){
+  const aw=flipAnchor(), as=screenOf(aw);
   boardSide = boardSide==='top' ? 'bot' : 'top';
   view.fh=!view.fh;
+  { const s2=screenOf(aw); view.x+=as.x-s2.x; view.y+=as.y-s2.y; }
   if(!xray){ showSide.top = boardSide==='top'; showSide.bot = boardSide==='bot'; }
   const vis=layers.filter(onSide);
   if(vis.length && !vis.some(l=>l.on)) { /* nothing visible on this side — leave as is */ }
