@@ -239,8 +239,12 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <div class="row"><span class="lbl" style="flex:none;width:40px">масшт</span>
             <input type="range" id="scl" min="0.2" max="5" step="0.002" value="1">
             <input type="text" class="num" id="sclv" inputmode="decimal" title="масштаб; Enter — применить"><span class="unit">×</span></div>
-          <button class="mini wide" id="moveBtn">Двигать слой мышью (M)</button>
-          <button class="mini wide" id="rstLayer">сброс слоя</button>
+          <div class="modes two">
+            <button class="mini" id="moveBtn" title="рамка: масштаб / вращение (клик по слою переключает), ⊕ — центр, внутри — сдвиг">Ручная деформация (M)</button>
+            <button class="mini" id="cropBtn" title="обрезать слой: тянуть стороны и углы рамки, внутри — сдвиг рамки">Кроп слоя</button>
+            <button class="mini" id="rstLayer">сброс слоя</button>
+            <button class="mini" id="rstCrop">сброс кропа</button>
+          </div>
         </div>
         <div class="sect">
           <div class="lbl">Удаление фона</div>
@@ -497,7 +501,7 @@ function mkLayer(i,init){
     id, name:'Слой '+(i+1), color:LAYPAL[i%LAYPAL.length], side:'any',
     src:'', stored:false, ok:false,
     x:0,y:0,rot:0,scale:1,fh:false,fv:false,op:1,on:true,H:null,
-    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15, cor:{...COR0},
+    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15, cor:{...COR0}, crop:null,
     w:1200,h:1200, pairs:[]
   },init||{});
   const clip=document.createElement('div'); clip.className='clip'; clip.dataset.id=id;
@@ -707,6 +711,8 @@ function applyLayer(l){
     l.box.style.transformOrigin='50% 50%';
     l.box.style.transform=`translate(-50%,-50%) translate(${l.x}px,${l.y}px) rotate(${l.rot}deg) scale(${l.scale*(l.fh?-1:1)},${l.scale*(l.fv?-1:1)})`;
   }
+  const cr=l.crop;
+  l.el.style.clipPath = cr ? `inset(${cr.y0}px ${l.w-cr.x1}px ${l.h-cr.y1}px ${cr.x0}px)` : 'none';
   const o=effOpacity(l);
   l.box.style.setProperty('--op',o); l.box.style.opacity=o;
   l.box.style.filter=inverted?'invert(1) hue-rotate(180deg)':'none';
@@ -793,6 +799,7 @@ function drawMarks(){
   });
   drawComps();
   if(clickMode==='move') drawLayerBox();
+  if(clickMode==='crop') drawCropBox();
 }
 
 /* ---------- components ---------- */
@@ -808,29 +815,61 @@ function compCorners(c){
     centre:{x:c.x,y:c.y}
   };
 }
-/* move mode: frame of the active layer; corner squares scale, round knob above the top edge rotates */
+/* manual transform (mode M), CorelDRAW-like: click on the layer toggles scale / rotate handles,
+   ⊕ = pivot for both (image px of the layer, runtime, default centre, drag to move, double-click resets) */
+let xfMode='scale';
+const pivotImg=l=>l.piv||{x:l.w/2,y:l.h/2};
+const evXY=e=>{ const r=vp.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; };
+function inLayer(l,e){ const p=imgOf(l,worldFromEvent(e)); return p.x>=0&&p.y>=0&&p.x<=l.w&&p.y<=l.h; }
 function layerBox(l){
   const q=[{x:0,y:0},{x:l.w,y:0},{x:l.w,y:l.h},{x:0,y:l.h}].map(p=>screenOf(worldOf(l,p)));
-  const c=screenOf({x:l.x,y:l.y}), mt={x:(q[0].x+q[1].x)/2,y:(q[0].y+q[1].y)/2};
-  const d=Math.hypot(mt.x-c.x,mt.y-c.y)||1, rk={x:mt.x+(mt.x-c.x)/d*26,y:mt.y+(mt.y-c.y)/d*26};
-  return {q,c,mt,rk};
+  return {q, P:screenOf(worldOf(l,pivotImg(l)))};
 }
+function drawPivot(P){
+  const g=(a)=>marks.appendChild(svg(a[0],a[1]));
+  g(['circle',{cx:P.x,cy:P.y,r:6,fill:'none',stroke:'#000','stroke-width':3,opacity:.6}]);
+  g(['circle',{cx:P.x,cy:P.y,r:6,fill:'none',stroke:'#fff','stroke-width':1.2}]);
+  g(['path',{d:`M${P.x-10} ${P.y}H${P.x+10}M${P.x} ${P.y-10}V${P.y+10}`,stroke:'#000','stroke-width':3,opacity:.6}]);
+  g(['path',{d:`M${P.x-10} ${P.y}H${P.x+10}M${P.x} ${P.y-10}V${P.y+10}`,stroke:'#fff','stroke-width':1}]);
+}
+function frame(q,dash){ const pts=q.map(p=>p.x+','+p.y).join(' ');
+  marks.appendChild(svg('polygon',{points:pts,fill:'none',stroke:'#000',opacity:.5,'stroke-width':3}));
+  marks.appendChild(svg('polygon',{points:pts,fill:'none',stroke:'#fff','stroke-width':1,'stroke-dasharray':dash||'6 4'})); }
 function drawLayerBox(){
   const l=sel_(); if(!l||l.H) return;
-  const b=layerBox(l), pts=b.q.map(p=>p.x+','+p.y).join(' ');
-  marks.appendChild(svg('polygon',{points:pts,fill:'none',stroke:'#000',opacity:.5,'stroke-width':3}));
-  marks.appendChild(svg('polygon',{points:pts,fill:'none',stroke:'#fff','stroke-width':1,'stroke-dasharray':'6 4'}));
-  marks.appendChild(svg('line',{x1:b.mt.x,y1:b.mt.y,x2:b.rk.x,y2:b.rk.y,stroke:'#fff','stroke-width':1}));
-  b.q.forEach(p=>marks.appendChild(svg('rect',{x:p.x-5,y:p.y-5,width:10,height:10,fill:'#fff',stroke:'#000','stroke-width':1})));
-  marks.appendChild(svg('circle',{cx:b.rk.x,cy:b.rk.y,r:6,fill:'#fff',stroke:'#000','stroke-width':1}));
+  const b=layerBox(l); frame(b.q);
+  if(xfMode==='scale')
+    b.q.forEach(p=>marks.appendChild(svg('rect',{x:p.x-5,y:p.y-5,width:10,height:10,fill:'#fff',stroke:'#000','stroke-width':1})));
+  else b.q.forEach(p=>{ /* curved-arrow rotation handles at the corners */
+    const t=svg('text',{x:p.x,y:p.y,fill:'#fff',stroke:'#000','stroke-width':3,'paint-order':'stroke','font-size':18,
+      'font-weight':700,'text-anchor':'middle','dominant-baseline':'central'}); t.textContent='↻'; marks.appendChild(t); });
+  drawPivot(b.P);
 }
-function hitLayerBox(e){ /* -> 'scale' | 'rot' | null, by screen distance to the handles */
+function hitLayerBox(e){ /* -> 'piv' | 'scale' | 'rot' | 'in' | null */
   const l=sel_(); if(!l||l.H) return null;
-  const r=vp.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, b=layerBox(l);
-  if(Math.hypot(x-b.rk.x,y-b.rk.y)<=9) return 'rot';
-  if(b.q.some(p=>Math.abs(x-p.x)<=8&&Math.abs(y-p.y)<=8)) return 'scale';
-  return null;
+  const m=evXY(e), b=layerBox(l);
+  if(Math.hypot(m.x-b.P.x,m.y-b.P.y)<=9) return 'piv';
+  if(b.q.some(p=>Math.hypot(m.x-p.x,m.y-p.y)<=10)) return xfMode==='scale'?'scale':'rot';
+  return inLayer(l,e)?'in':null;
 }
+/* crop mode: rectangle in image px of the active layer (works on warped layers too) */
+const cropRect=l=>l.crop||{x0:0,y0:0,x1:l.w,y1:l.h};
+const CROPH=[['x0','y0'],['x1','y0'],['x1','y1'],['x0','y1'],[null,'y0'],['x1',null],[null,'y1'],['x0',null]];
+function cropHandles(l){ const c=cropRect(l), mx=(c.x0+c.x1)/2, my=(c.y0+c.y1)/2;
+  return CROPH.map(([ex,ey])=>({ex,ey,p:screenOf(worldOf(l,{x:ex?c[ex]:mx,y:ey?c[ey]:my}))})); }
+function drawCropBox(){
+  const l=sel_(); if(!l) return;
+  const full=[{x:0,y:0},{x:l.w,y:0},{x:l.w,y:l.h},{x:0,y:l.h}].map(p=>screenOf(worldOf(l,p)));
+  marks.appendChild(svg('polygon',{points:full.map(p=>p.x+','+p.y).join(' '),fill:'none',stroke:'#fff',
+    'stroke-width':1,'stroke-dasharray':'2 4',opacity:.6}));
+  const c=cropRect(l); frame([{x:c.x0,y:c.y0},{x:c.x1,y:c.y0},{x:c.x1,y:c.y1},{x:c.x0,y:c.y1}].map(p=>screenOf(worldOf(l,p))),'none');
+  cropHandles(l).forEach(h=>marks.appendChild(svg('rect',{x:h.p.x-4.5,y:h.p.y-4.5,width:9,height:9,
+    fill:'#000',stroke:'#fff','stroke-width':1.2})));
+}
+function hitCropBox(e){ const l=sel_(); if(!l) return null;
+  const m=evXY(e), h=cropHandles(l).find(h=>Math.hypot(m.x-h.p.x,m.y-h.p.y)<=9); if(h) return h;
+  const c=cropRect(l), q=imgOf(l,worldFromEvent(e));
+  return (q.x>=c.x0&&q.x<=c.x1&&q.y>=c.y0&&q.y<=c.y1)?{ex:'in'}:null; }
 function drawComps(){
   if(!comps.length&&!calib) return;
   const poly=(pts,fill,stroke,wd,dash,op)=>{
@@ -1070,7 +1109,7 @@ function syncComps(){
   $('compStatus').innerHTML = !mmScale ? 'Сначала калибровка масштаба.'
     : (clickMode==='comp'
        ? `Клик по плате ставит <b>${compKind}${compSeq[compKind]}</b> · ${compSize} · ${compSide}-comp · ${compRot}°.`
-       : 'Клик по компоненту — выбрать, перетаскивание — двигать, Space — поворот на 45°.')       + (clickMode==='move' ? '<br><b>Режим сдвига слоя</b> — компоненты сейчас не ловятся.' : '');
+       : 'Клик по компоненту — выбрать, перетаскивание — двигать, Space — поворот на 45°.')       + (clickMode==='move'||clickMode==='crop' ? '<br><b>Режим правки слоя</b> — компоненты сейчас не ловятся.' : '');
 }
 /* ---------- layer cards ---------- */
 const TINTS=[['color','цвет','цвет (сохраняет яркость)'],['multiply','умн','умножение'],
@@ -1318,10 +1357,13 @@ function sync(){
   const cue=$('hudCue');
   if(picking){cue.hidden=false;cue.textContent=`точка ${np+1}: клик по «${nextName}»`;}
   else if(netting&&an){cue.hidden=false;cue.textContent=`${an.name}: клик ставит точку на «${s?s.name:'—'}» · Alt+клик — переходное`;}
+  else if(clickMode==='move'){cue.hidden=false;cue.textContent=`деформация: ${xfMode==='scale'?'масштаб':'вращение'} · клик по слою — сменить · ⊕ — центр (двойной клик — в центр) · Shift — шаг 15°`;}
+  else if(clickMode==='crop'){cue.hidden=false;cue.textContent='кроп «'+(s?s.name:'—')+'»: тяните стороны и углы, внутри — сдвиг рамки';}
   else cue.hidden=true;
   vp.classList.toggle('picking',clickMode!=='none');
   $('moveBtn').classList.toggle('on',clickMode==='move');
-  $('moveBtn').textContent=clickMode==='move'?'Сдвиг слоя включён — выключить':'Двигать слой мышью (M)';
+  $('cropBtn').classList.toggle('on',clickMode==='crop'); $('cropBtn').disabled=!sel_();
+  $('rstCrop').disabled=!(sel_()&&sel_().crop);
   $('moveBtn').disabled=!!(sel_()&&sel_().H);
   $('gridBtn').classList.toggle('on',grid); vp.classList.toggle('nogrid',!grid);
   $('invBtn').classList.toggle('on',inverted);
@@ -1349,7 +1391,7 @@ function snapshot(){
     inverted, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.color,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
-      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor})),
+      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop})),
     nets, points, activeNet, netSeq,
     comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
 }
@@ -1369,7 +1411,7 @@ function restore(s){
     tc:d.tc||LAYPAL[i%LAYPAL.length], tn:typeof d.tn==='number'?d.tn:0,
     tm:d.tm||s.tintMode||'color',
     blend:d.blend||'normal', pairs:Array.isArray(d.pairs)?d.pairs:[],
-    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{})});
+    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{}), crop:d.crop||null});
     layers.push(l); });
   restack();
   sel=byId(s.sel)?s.sel:layers[layers.length-1].id;
@@ -1614,12 +1656,18 @@ vp.addEventListener('pointerdown',e=>{
   if(e.target===handle){drag={t:'swipe'};vp.setPointerCapture(e.pointerId);return;}
   if(clickMode==='move'){
     const hb=hitLayerBox(e);
-    if(hb){ const r=vp.getBoundingClientRect(), c=layerBox(s).c, px=e.clientX-r.left, py=e.clientY-r.top;
-      drag={t:'l'+hb,x:e.clientX,y:e.clientY,moved:false,cx:c.x,cy:c.y,
-        d0:Math.hypot(px-c.x,py-c.y)||1, a0:Math.atan2(py-c.y,px-c.x), osc:s.scale, orot:s.rot};
+    if(hb==='piv'){ drag={t:'piv',x:e.clientX,y:e.clientY,moved:false}; vp.setPointerCapture(e.pointerId); return; }
+    if(hb==='scale'||hb==='rot'){ const P=layerBox(s).P, m=evXY(e);
+      drag={t:'l'+hb,x:e.clientX,y:e.clientY,moved:false,P,Pw:worldOf(s,pivotImg(s)),
+        d0:Math.hypot(m.x-P.x,m.y-P.y)||1, a0:Math.atan2(m.y-P.y,m.x-P.x), osc:s.scale, orot:s.rot, ox:s.x, oy:s.y};
       vp.setPointerCapture(e.pointerId); return; }
-    if(s&&!s.H){ drag={t:'layer',x:e.clientX,y:e.clientY,moved:false,ox:s.x,oy:s.y};
+    if(s&&!s.H){ drag={t:'layer',x:e.clientX,y:e.clientY,moved:false,ox:s.x,oy:s.y,inside:hb==='in'};
       vp.classList.add('grabbing'); vp.setPointerCapture(e.pointerId); }
+    return; }
+  if(clickMode==='crop'){
+    const h=s&&hitCropBox(e);
+    if(h){ drag={t:'crop',x:e.clientX,y:e.clientY,moved:false,h,oc:{...cropRect(s)},o:imgOf(s,worldFromEvent(e))};
+      vp.setPointerCapture(e.pointerId); }
     return; }
   {
     const m=worldFromEvent(e);
@@ -1638,9 +1686,16 @@ vp.addEventListener('pointerdown',e=>{
   drag={t:'click',x:e.clientX,y:e.clientY,moved:false};
   vp.setPointerCapture(e.pointerId);
 });
+vp.addEventListener('dblclick',e=>{
+  if(clickMode==='move'&&hitLayerBox(e)==='piv'){ const s=sel_(); s.piv=null; drawMarks(); }
+});
 vp.addEventListener('pointermove',e=>{
-  if(!drag){ if(clickMode==='move'){ const h=hitLayerBox(e);
-      vp.style.cursor=h==='scale'?'nwse-resize':h==='rot'?'alias':''; } return; }
+  if(!drag){
+    if(clickMode==='move'){ const h=hitLayerBox(e);
+      vp.style.cursor=h==='piv'?'move':h==='scale'?'nwse-resize':h==='rot'?'alias':''; }
+    if(clickMode==='crop'){ const h=sel_()&&hitCropBox(e);
+      vp.style.cursor=!h?'':h.ex==='in'?'move':(h.ex&&h.ey)?'nwse-resize':h.ex?'ew-resize':'ns-resize'; }
+    return; }
   if(drag.t==='swipe'){const r=vp.getBoundingClientRect();
     swipe=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)); applyClip(); save(); return;}
   const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
@@ -1649,14 +1704,31 @@ vp.addEventListener('pointermove',e=>{
   if(drag.t==='layer'){const s=sel_(); if(!s||s.H)return;
     const d=screenDelta(dx,dy);
     s.x=drag.ox+d.x; s.y=drag.oy+d.y; applyLayer(s); sync(); return;}
+  if(drag.t==='piv'){ const s=sel_(); if(!s)return; s.piv=imgOf(s,worldFromEvent(e)); drawMarks(); return; }
   if(drag.t==='lscale'||drag.t==='lrot'){ const s=sel_(); if(!s||s.H)return;
-    const r=vp.getBoundingClientRect(), px=e.clientX-r.left-drag.cx, py=e.clientY-r.top-drag.cy;
-    if(drag.t==='lscale') s.scale=Math.max(.01,+(drag.osc*Math.hypot(px,py)/drag.d0).toFixed(4));
-    else { let da=(Math.atan2(py,px)-drag.a0)*180/Math.PI;
+    const m=evXY(e), px=m.x-drag.P.x, py=m.y-drag.P.y, W=drag.Pw, t0={x:drag.ox-W.x,y:drag.oy-W.y};
+    if(drag.t==='lscale'){       /* scale about the pivot: t' = Pw + k (t - Pw) */
+      s.scale=Math.max(.01,+(drag.osc*Math.hypot(px,py)/drag.d0).toFixed(4));
+      const k=s.scale/drag.osc; s.x=W.x+k*t0.x; s.y=W.y+k*t0.y;
+    } else {                     /* rotate about the pivot: t' = Pw + R(d) (t - Pw) */
+      let da=(Math.atan2(py,px)-drag.a0)*180/Math.PI;
       if(!!view.fh!==!!view.fv) da=-da;          /* mirrored view turns the other way */
       let a=drag.orot+da; if(e.shiftKey) a=Math.round(a/15)*15;
-      s.rot=+((((a+180)%360+360)%360)-180).toFixed(2); }
+      s.rot=+((((a+180)%360+360)%360)-180).toFixed(2);
+      const v=rotV(t0,(a-drag.orot)*Math.PI/180); s.x=W.x+v.x; s.y=W.y+v.y;
+    }
     applyLayer(s); sync(); return;}
+  if(drag.t==='crop'){ const s=sel_(); if(!s)return;
+    const q=imgOf(s,worldFromEvent(e)), c={...drag.oc}, h=drag.h, MIN=8;
+    const cx=v=>Math.max(0,Math.min(s.w,v)), cy=v=>Math.max(0,Math.min(s.h,v));
+    if(h.ex==='in'){ const dx=Math.max(-c.x0,Math.min(s.w-c.x1,q.x-drag.o.x)), dy=Math.max(-c.y0,Math.min(s.h-c.y1,q.y-drag.o.y));
+      c.x0+=dx; c.x1+=dx; c.y0+=dy; c.y1+=dy; }
+    else {
+      if(h.ex==='x0') c.x0=Math.min(cx(q.x),c.x1-MIN); if(h.ex==='x1') c.x1=Math.max(cx(q.x),c.x0+MIN);
+      if(h.ey==='y0') c.y0=Math.min(cy(q.y),c.y1-MIN); if(h.ey==='y1') c.y1=Math.max(cy(q.y),c.y0+MIN);
+    }
+    for(const k in c) c[k]=Math.round(c[k]*10)/10;
+    s.crop=(c.x0<=0&&c.y0<=0&&c.x1>=s.w&&c.y1>=s.h)?null:c; applyLayer(s); return; }
   if(drag.t==='comp'){const c=comps.find(o=>o.id===drag.id); if(!c)return;
     const d=screenDelta(dx,dy); c.x=drag.ox+d.x; c.y=drag.oy+d.y; drawMarks(); save(); return;}
   if(drag.t==='calib'&&calib){const d=screenDelta(dx,dy);
@@ -1666,6 +1738,7 @@ vp.addEventListener('pointerup',e=>{
   if(e.button===1){ drag=null; vp.classList.remove('grabbing'); return; }
   if(e.button!==0)return;
   const d=drag; drag=null; vp.classList.remove('grabbing');
+  if(d&&d.t==='layer'&&!d.moved&&d.inside){ xfMode=xfMode==='scale'?'rot':'scale'; drawMarks(); sync(); return; }
   if(d&&d.t==='comp'&&d.moved){ const c=comps.find(o=>o.id===d.id);
     if(c&&autoPins(c)){ renderProps(); drawMarks(); save(); } return; }
   if(!d||d.moved||d.t!=='click')return;
@@ -1753,6 +1826,9 @@ numIn('sclv',v=>{ const s=sel_(); if(!s||s.H)return;
 $('scl').oninput=()=>{const s=sel_(); if(!s)return; s.scale=parseFloat($('scl').value);applyLayer(s);sync()};
 $('rstLayer').onclick=()=>{const s=sel_(); if(!s)return;
   s.x=s.y=s.rot=0;s.scale=1;s.H=null;warpInfo='';applyLayer(s);renderCards();sync()};
+$('cropBtn').onclick=()=>{ clickMode=clickMode==='crop'?'none':'crop';
+  if(clickMode==='crop'){pending=null;calib=null;} sync();syncComps();drawMarks(); };
+$('rstCrop').onclick=()=>{ const s=sel_(); if(!s)return; s.crop=null; applyLayer(s); sync(); };
 $('moveBtn').onclick=()=>{ clickMode=clickMode==='move'?'none':'move';
   if(clickMode==='move'){pending=null;calib=null;} sync();syncComps();drawMarks(); };
 function flipBoard(){
