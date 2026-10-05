@@ -1889,7 +1889,8 @@ vp.addEventListener('pointerup',e=>{
     drawMarks(); syncComps(); return;
   }
   if(clickMode==='none'){
-    const hc=hitComp(m);
+    const hit=hitPoint(m), hc=!hit&&hitComp(m);
+    if(!hit&&(hlNet||selPoint)){ hlNet=null; selPoint=null; renderNets(); sync(); }   /* click off a NET point clears it */
     if(hc){ selComp=hc.id; renderComps(); drawMarks(); syncComps(); return; }
   }
   if(clickMode==='align'&&s){
@@ -1918,7 +1919,8 @@ vp.addEventListener('pointerup',e=>{
     return;
   }
   const hit=hitPoint(m);
-  if(hit){ hlNet=hit.net; activeNet=hit.net; selPoint=hit.id; renderNets(); sync(); drawMarks(); }
+  if(hit){ hlNet=hit.net; activeNet=hit.net; selPoint=hit.id; renderNets(); sync(); }
+  drawMarks();
 });
 vp.addEventListener('contextmenu',e=>{ /* delete only in the matching edit mode */
   if(clickMode==='comp'||clickMode==='net') e.preventDefault();
