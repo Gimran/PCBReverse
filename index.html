@@ -1387,6 +1387,7 @@ function renderVideo(){
     .map(([tx,a,tt])=>btn(tx,tt,()=>{ if(l.H){l.H=null;warpInfo='';}
       if(typeof a==='string') l[a]=!l[a]; else { l.rot=Math.round((l.rot+a)*10)/10; if(l.rot>180)l.rot-=360; if(l.rot<-180)l.rot+=360; }
       applyLayer(l); renderVideo(); sync(); },l[a]===true?'on':'')));
+  if(win) fl.querySelectorAll('button').forEach(b=>b.disabled=true);   /* they act on the overlay only */
   const md=grid('two',...[['move','Ручная деформация (M)','рамка: масштаб / вращение (клик по слою переключает), ⊕ — центр'],
      ['crop','Кроп','участок кадра для снимка; края размываются внутри кропа']].map(([m,tx,tt])=>{
       const b=btn(tx,tt,()=>videoMode(l,m),clickMode===m&&sel===l.id?'on':''); b.dataset.mode=m; b.dataset.lid=l.id;
@@ -1404,8 +1405,7 @@ function setVmode(l,m){ l.vmode=m;
 function syncVidWin(){ /* window mode: the same stream in a plain <video> at the bottom of the tab */
   const l=videoLayer(), w=$('vidWin'), on=!!(l&&l.stream&&l.vmode==='window');
   $('vidWinBox').hidden=!on;
-  if(on){ if(w.srcObject!==l.stream) w.srcObject=l.stream;
-    w.style.transform=`rotate(${l.rot||0}deg) scale(${l.fh?-1:1},${l.fv?-1:1})`; }
+  w.style.transform=''; if(on&&w.srcObject!==l.stream) w.srcObject=l.stream;   /* raw camera image: no overlay transforms */
   else if(w.srcObject) w.srcObject=null;
 }
 
