@@ -329,6 +329,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>[ ]</b> — поворот 0.1° · <b>Shift</b> — ×10<br>
             <b>P</b> — опорные точки · <b>N</b> — редактирование NET · <b>K</b> — редактирование компонентов<br>
             <b>Alt+клик</b> в режиме N — переходное отверстие (точка на обеих сторонах)<br>
+            <b>Ctrl+клик</b> в режиме N — новый NET с первой точкой, сразу ввод имени<br>
             <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> / <b>Delete</b> — удалить (только в режимах N / K) · <b>Esc</b> — выход
           </div>
         </div>
@@ -1396,8 +1397,12 @@ function addNet(focus){
   const n={id:'n'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
     name:'NET'+(netSeq++), color:NETPAL[nets.length%NETPAL.length], on:true};
   nets.push(n); activeNet=n.id; hlNet=n.id; renderNets(); sync(); save(); drawMarks();
-  if(focus){ const i=$('netlist').querySelector(`input[data-net="${n.id}"]`);  /* type the name right away */
-    if(i){ i.scrollIntoView({block:'nearest'}); i.focus(); i.select(); } }
+  if(focus) focusNetName(n.id);
+}
+function focusNetName(id){ /* type the name right away */
+  if(document.querySelector('[data-page="nets"]').hidden) document.querySelector('[data-tab="nets"]').click();
+  const i=$('netlist').querySelector(`input[data-net="${id}"]`);
+  if(i){ i.scrollIntoView({block:'nearest'}); i.focus(); i.select(); }
 }
 function hitPoint(m){
   let best=null,bd=12/Math.abs(view.z);
@@ -1480,7 +1485,7 @@ function sync(){
 
   const cue=$('hudCue');
   if(picking){cue.hidden=false;cue.textContent=`точка ${np+1}: клик по «${nextName}»`;}
-  else if(netting&&an){cue.hidden=false;cue.textContent=`${an.name}: клик ставит точку на «${s?s.name:'—'}» · Alt+клик — переходное`;}
+  else if(netting&&an){cue.hidden=false;cue.textContent=`${an.name}: клик — точка · Alt+клик — переходное · Ctrl+клик — новый NET`;}
   else if(clickMode==='move'){cue.hidden=false;cue.textContent=`деформация: ${xfMode==='scale'?'масштаб':'вращение'} · клик по слою — сменить · ⊕ — центр (двойной клик — в центр) · Shift — шаг 15°`;}
   else if(clickMode==='crop'){cue.hidden=false;cue.textContent='кроп «'+(s?s.name:'—')+'»: тяните стороны и углы, внутри — сдвиг рамки';}
   else cue.hidden=true;
@@ -1896,7 +1901,9 @@ vp.addEventListener('pointerup',e=>{
     sync(); drawMarks(); save(); return;
   }
   if(clickMode==='net'&&s){
-    const hit=hitPoint(m);
+    const newNet=e.ctrlKey;            /* Ctrl+click: new NET with its first point here, then type its name */
+    if(newNet) addNet(false);
+    const hit=!newNet&&hitPoint(m);
     if(hit){ selPoint=hit.id; activeNet=hit.net; hlNet=hit.net; renderNets(); }
     else if(activeNet){
       const via=e.altKey; /* Alt+click: via, shown on both sides */
@@ -1906,7 +1913,9 @@ vp.addEventListener('pointerup',e=>{
       pinFromPoint(m,activeNet,via);
       selPoint=null; renderNets();
     }
-    sync(); drawMarks(); save(); return;
+    sync(); drawMarks(); save();
+    if(newNet) focusNetName(activeNet);
+    return;
   }
   const hit=hitPoint(m);
   if(hit){ hlNet=hit.net; activeNet=hit.net; selPoint=hit.id; renderNets(); sync(); drawMarks(); }
