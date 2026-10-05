@@ -257,8 +257,9 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
         <div class="sect">
           <div class="lbl">Коррекция цвета</div>
           <div id="corBox" style="display:flex;flex-direction:column;gap:6px"></div>
-          <div class="modes three">
+          <div class="modes two">
             <button class="mini" id="corText" title="Ч/Б, контраст, резкость — читаемость подписей">подписи</button>
+            <button class="mini" id="corTextCol" title="как «подписи» + чёрн 100% + тонировка слоя «осветление» 100% цветом тонировки">ЦВ подписи</button>
             <button class="mini" id="corThr" title="Ч/Б в два уровня — только тёмное/светлое">порог Ч/Б</button>
             <button class="mini" id="corReset">сброс</button>
           </div>
@@ -1832,9 +1833,11 @@ CORUI.forEach(([k,lab,mn,mx,st,fmt,tt])=>{
 function syncCor(){ const s=sel_();
   CORUI.forEach(([k,,,,,fmt])=>{ const i=$('cor_'+k); i.disabled=!s; if(!s)return;
     if(document.activeElement!==i) i.value=s.cor[k]; $('corv_'+k).textContent=fmt(s.cor[k]); });
-  ['corText','corThr','corReset'].forEach(i=>$(i).disabled=!s); }
+  ['corText','corTextCol','corThr','corReset'].forEach(i=>$(i).disabled=!s); }
 const corPreset=a=>{ const s=sel_(); if(!s)return; s.cor={...COR0,...a}; applyTint(s); syncCor(); save(); };
 $('corText').onclick=()=>corPreset({sat:0,ct:1.8,sh:.6});
+$('corTextCol').onclick=()=>{ const s=sel_(); if(!s)return;  /* coloured labels: also sets the layer's own tint */
+  s.tm='screen'; s.tn=1; corPreset({sat:0,ct:1.8,sh:.6,lb:1}); renderCards(); };
 $('corThr').onclick=()=>corPreset({sat:0,ct:1.6,pz:2});
 $('corReset').onclick=()=>corPreset({});
 $('keyOn').onclick=()=>{ const l=sel_(); if(!l)return; l.kOn=!l.kOn; applyLayer(l); sync(); };
