@@ -1,32 +1,37 @@
 /*
  * Smoke test for index.html (PCB reverse overlay).
- * Run:   npm i -D playwright  (once)   then   node tests/smoke.js [state.json]
- * Loads the page from disk, optionally seeds localStorage with a saved state,
- * and checks the invariants that broke during development.
+ * Run:   npm i -D playwright  (once)   then   node tests/smoke.js [project.pcbr | state.json]
+ * Loads the page from disk, opens the reference project (default tests/test_project.pcbr)
+ * through «Загрузить проект», and checks the invariants that broke during development.
  */
 const path = require('path'), fs = require('fs');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
 const URL = 'file:///' + path.join(ROOT, 'index.html').replace(/\\/g, '/');
-const STATE = process.argv[2] ? path.resolve(process.argv[2]) : path.join(ROOT, 'pcb_overlay_state.json');
+const STATE = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, 'test_project.pcbr');
+const PCBR = /\.pcbr$/i.test(STATE);
 
 (async () => {
   const b = await chromium.launch();
-  const p = await b.newPage({ viewport: { width: 1500, height: 950 } });
+  const p = await b.newPage({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   let fail = 0; const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) fail++; };
 
   await p.goto(URL); await p.waitForTimeout(600);
-  if (fs.existsSync(STATE)) {
+  await p.evaluate(() => localStorage.clear());
+  if (PCBR) {
+    await p.setInputFiles('#fileProj', STATE); await p.waitForTimeout(2000);
+    ok(await p.evaluate(() => /Проект загружен/.test($('saveStatus').textContent)), 'project loads: ' + path.basename(STATE));
+  } else if (fs.existsSync(STATE)) {
     const s = JSON.parse(fs.readFileSync(STATE, 'utf8'));
     // images picked via dialog live in the browser only - point them at the disk copies
     s.layers.forEach(l => { if (l.src) { l.src = 'pcb_overlay_img/' + l.src.split(/[\\/]/).pop(); l.stored = false; } });
-    await p.evaluate(x => { localStorage.clear(); localStorage.setItem('pcb-overlay-v4', x); }, JSON.stringify(s));
-  } else await p.evaluate(() => localStorage.clear());
-  await p.reload(); await p.waitForTimeout(2000);
+    await p.evaluate(x => { localStorage.setItem('pcb-overlay-v4', x); }, JSON.stringify(s));
+    await p.reload(); await p.waitForTimeout(2000);
+  }
 
-  const L = await p.evaluate(() => layers.map(l => ({ id: l.id, src: l.src, ok: l.ok })));
-  ok(L.filter(l => l.src).every(l => l.ok), 'all layer images load: ' + L.map(l => l.id + (l.ok ? '+' : '-')).join(' '));
+  const L = await p.evaluate(() => layers.map(l => ({ id: l.id, src: l.src, stored: l.stored, ok: l.ok })));
+  ok(L.filter(l => l.src || l.stored).every(l => l.ok), 'all layer images load: ' + L.map(l => l.id + (l.ok ? '+' : '-')).join(' '));
 
   // 1. click -> world -> screen round trip under every view rotation / flip
   const rt = await p.evaluate(() => {
@@ -62,6 +67,20 @@ const STATE = process.argv[2] ? path.resolve(process.argv[2]) : path.join(ROOT, 
   await p.mouse.move(700, 500); await p.mouse.down(); await p.mouse.move(760, 540, { steps: 4 }); await p.mouse.up();
   const after = await p.evaluate(() => { const s = sel_(); return { x: s.x, y: s.y }; });
   ok(moved.x === after.x && moved.y === after.y, 'plain LMB drag does not move the active layer');
+
+  // 5. «Сохранить проект» writes a .pcbr whose project.json matches the live state, with every image
+  if (PCBR) {
+    await p.evaluate(() => { window.showSaveFilePicker = undefined; });
+    const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#projSave')]);
+    const buf = fs.readFileSync(await dl.path());
+    const r = await p.evaluate(async a => {
+      const ent = await unzip(new Uint8Array(a).buffer), s = JSON.parse(new TextDecoder().decode(ent['project.json']));
+      const strip = o => JSON.stringify({ ...o, layers: o.layers.map(({ stored, file, ...rest }) => rest) });
+      return { eq: strip(s) === strip(snapshot()), files: s.layers.filter(l => l.file && ent[l.file]).length,
+               n: layers.filter(l => l.src || l.stored).length };
+    }, [...buf]);
+    ok(r.eq && r.files === r.n, 'save project round trip: json equal=' + r.eq + ', images ' + r.files + '/' + r.n);
+  }
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await b.close();

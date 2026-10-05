@@ -301,7 +301,9 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 
       <div class="sect">
         <div class="row">
+          <input type="color" id="colTop" title="цвет компонентов top">
           <button class="mini on" id="showTop" style="flex:1">top-comp</button>
+          <input type="color" id="colBot" title="цвет компонентов bot">
           <button class="mini on" id="showBot" style="flex:1">bot-comp</button>
         </div>
         <div class="complist" id="complist"></div>
@@ -424,7 +426,8 @@ const onSide=l=>xray||l.side==='any'||l.side===boardSide;
 let nets=[], points=[], activeNet=null, hlNet=null, selPoint=null, netSeq=1;
 const PKG={ '0201':{L:0.60,W:0.30,T:0.15}, '0402':{L:1.00,W:0.50,T:0.25},
             '0603':{L:1.60,W:0.80,T:0.35}, '0805':{L:2.00,W:1.25,T:0.40} };
-const SIDECOL={top:'#e8b04b', bot:'#59a7d8'};
+const SIDECOL_DEF={top:'#ff0000', bot:'#0000ff'};
+let SIDECOL={...SIDECOL_DEF}; /* component colour per side, editable, saved */
 let comps=[], selComp=null, mmScale=0, compSeq={R:1,C:1};
 let compKind='R', compSize='0603', compSide='top', compRot=0;
 let compEditShown=false; /* comp panel rendered for edit mode */
@@ -850,6 +853,7 @@ function renderComps(){
     row.append(sw,d,v,sz,x); box.appendChild(row);
   });
   renderProps();
+  $('colTop').value=SIDECOL.top; $('colBot').value=SIDECOL.bot;
   $('showTop').classList.toggle('on',showSide.top);
   $('showBot').classList.toggle('on',showSide.bot);
 }
@@ -1201,7 +1205,7 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, showSide, warpModel, imgDir, projName};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, warpModel, imgDir, projName};
 }
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
@@ -1233,6 +1237,7 @@ function restore(s){
   compSeq=s.compSeq||{R:1,C:1}; compKind=s.compKind||'R'; compSize=s.compSize||'0603';
   compSide=s.compSide||'top'; compRot=+s.compRot||0;
   compVal=Object.assign({R:'',C:''},s.compVal||{});
+  SIDECOL=Object.assign({...SIDECOL_DEF},s.sideCol||{});
   showSide=Object.assign({top:true,bot:true},s.showSide||{});
   selComp=null; calib=null; warpModel=s.warpModel==='persp'?'persp':'affine';
   imgDir=typeof s.imgDir==='string'?s.imgDir:'pcb_overlay_img/';
@@ -1647,6 +1652,8 @@ $('calRotR').onclick=()=>rotateComp(45);
 $('calDone').onclick=()=>{ clickMode='none'; calib=null; sync();syncComps();drawMarks();save(); };
 $('calSize').onchange=()=>{ if(calib)calib.size=$('calSize').value; syncComps(); drawMarks(); };
 $('calRange').oninput=e=>{ mmScale=sliderToScale(+e.target.value); syncComps(); drawMarks(); save(); };
+$('colTop').oninput=e=>{SIDECOL.top=e.target.value;renderComps();drawMarks();save()};
+$('colBot').oninput=e=>{SIDECOL.bot=e.target.value;renderComps();drawMarks();save()};
 $('showTop').onclick=()=>{showSide.top=!showSide.top;renderComps();drawMarks();save()};
 $('showBot').onclick=()=>{showSide.bot=!showSide.bot;renderComps();drawMarks();save()};
 $('addNet').onclick=addNet;
