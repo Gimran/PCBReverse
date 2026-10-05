@@ -1211,7 +1211,8 @@ function renderNets(){
     const col=document.createElement('input'); col.type='color'; col.value=n.color;
     col.oninput=e=>{n.color=e.target.value;drawMarks();save()};
     col.onclick=e=>e.stopPropagation();
-    const nm=document.createElement('input'); nm.type='text'; nm.value=n.name;
+    const nm=document.createElement('input'); nm.type='text'; nm.value=n.name; nm.dataset.net=n.id;
+    nm.onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape') nm.blur(); };
     nm.oninput=e=>{n.name=e.target.value;drawMarks();save()};
     nm.onclick=e=>e.stopPropagation();
     const cnt=document.createElement('span'); cnt.className='cnt';
@@ -1227,10 +1228,12 @@ function renderNets(){
     row.append(grip,col,nm,cnt,eye,del); box.appendChild(row);
   });
 }
-function addNet(){
+function addNet(focus){
   const n={id:'n'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
     name:'NET'+(netSeq++), color:NETPAL[nets.length%NETPAL.length], on:true};
   nets.push(n); activeNet=n.id; hlNet=n.id; renderNets(); sync(); save(); drawMarks();
+  if(focus){ const i=$('netlist').querySelector(`input[data-net="${n.id}"]`);  /* type the name right away */
+    if(i){ i.scrollIntoView({block:'nearest'}); i.focus(); i.select(); } }
 }
 function hitPoint(m){
   let best=null,bd=12/Math.abs(view.z);
@@ -1815,7 +1818,7 @@ $('colTop').oninput=e=>{SIDECOL.top=e.target.value;renderComps();drawMarks();sav
 $('colBot').oninput=e=>{SIDECOL.bot=e.target.value;renderComps();drawMarks();save()};
 $('showTop').onclick=()=>{showSide.top=!showSide.top;renderComps();drawMarks();save()};
 $('showBot').onclick=()=>{showSide.bot=!showSide.bot;renderComps();drawMarks();save()};
-$('addNet').onclick=addNet;
+$('addNet').onclick=()=>addNet(true);
 $('netPickBtn').onclick=()=>{ if(!nets.length)addNet();
   clickMode=clickMode==='net'?'none':'net'; if(clickMode==='net')showNets=true; sync();drawMarks()};
 CORUI.forEach(([k,lab,mn,mx,st,fmt,tt])=>{
