@@ -178,6 +178,10 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 .net .cnt{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted);
   font-variant-numeric:tabular-nums;min-width:26px;text-align:right}
 .net .x{width:22px;height:22px;padding:0;font-size:11px;line-height:1;flex:none}
+.net .grip{align-self:stretch;flex:none;width:18px;margin:-5px 0 -5px -6px;display:flex;align-items:center;
+  justify-content:center;border-right:1px solid var(--line);color:var(--muted);font-size:10px;border-radius:3px 0 0 3px}
+.net .grip:hover{background:var(--line);color:var(--text)}
+.net.active .grip{color:var(--text)}
 .empty{font-size:12px;color:var(--muted);font-style:italic}
 .filerow{border:1px solid var(--line);border-radius:5px;background:var(--panel-2);padding:8px;
   display:flex;flex-direction:column;gap:7px}
@@ -199,6 +203,10 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <div class="row">
             <button class="mini" id="flipBoard" style="flex:1">Перевернуть плату (F)</button>
             <button class="mini" id="xrayBtn" title="рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы">XRAY</button>
+          </div>
+          <div class="row"><span class="lbl" style="flex:none">Показать</span>
+            <button class="mini on" id="showNetsBtn" style="flex:1" title="точки всех нетов">неты</button>
+            <button class="mini on" id="showCompsBtn" style="flex:1" title="все компоненты">компоненты</button>
           </div>
           <div class="row"><span class="lbl" style="flex:none">Вид</span>
             <button class="mini" id="vrotL" style="flex:1" title="повернуть вид на 90° влево (Shift+R)">↺ 90°</button>
@@ -422,6 +430,7 @@ let layers=[];                 /* index 0 = bottom */
 let view={x:0,y:0,z:1,rot:0,fh:false,fv:false}, sel=null, refId=null, viewMode='all', swipe=.5;
 let inverted=false, grid=true, tintMode='color', labels=true, blinkOn=true;
 let clickMode='none', pending=null, warpInfo='', boardSide='top', xray=false;
+let showNets=true, showComps=true; /* global overlay toggles */
 /* xray — boardSide не скрывает слои другой стороны */
 const onSide=l=>xray||l.side==='any'||l.side===boardSide;
 let nets=[], points=[], activeNet=null, hlNet=null, selPoint=null, netSeq=1;
@@ -681,7 +690,7 @@ function drawMarks(){
       'font-family':'IBM Plex Mono, monospace',opacity:.55}); n.textContent=String(i+1); marks.appendChild(n);
   });
   if(pending&&byId(refId)) cross(screenOf(worldOf(byId(refId),pending)),6,.8);
-  points.forEach(pt=>{
+  if(showNets) points.forEach(pt=>{
     const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
     if(!net||!net.on||!lay||!ptShown(pt,lay)) return;
     const p=screenOf(worldOf(lay,pt.p));
@@ -697,6 +706,7 @@ function drawMarks(){
     if(labels) txt(p,net.color,net.name+(pt.via?' ·via':' ·'+lay.id.slice(1)),op);
   });
   drawComps();
+  if(clickMode==='move') drawLayerBox();
 }
 
 /* ---------- components ---------- */
@@ -712,6 +722,29 @@ function compCorners(c){
     centre:{x:c.x,y:c.y}
   };
 }
+/* move mode: frame of the active layer; corner squares scale, round knob above the top edge rotates */
+function layerBox(l){
+  const q=[{x:0,y:0},{x:l.w,y:0},{x:l.w,y:l.h},{x:0,y:l.h}].map(p=>screenOf(worldOf(l,p)));
+  const c=screenOf({x:l.x,y:l.y}), mt={x:(q[0].x+q[1].x)/2,y:(q[0].y+q[1].y)/2};
+  const d=Math.hypot(mt.x-c.x,mt.y-c.y)||1, rk={x:mt.x+(mt.x-c.x)/d*26,y:mt.y+(mt.y-c.y)/d*26};
+  return {q,c,mt,rk};
+}
+function drawLayerBox(){
+  const l=sel_(); if(!l||l.H) return;
+  const b=layerBox(l), pts=b.q.map(p=>p.x+','+p.y).join(' ');
+  marks.appendChild(svg('polygon',{points:pts,fill:'none',stroke:'#000',opacity:.5,'stroke-width':3}));
+  marks.appendChild(svg('polygon',{points:pts,fill:'none',stroke:'#fff','stroke-width':1,'stroke-dasharray':'6 4'}));
+  marks.appendChild(svg('line',{x1:b.mt.x,y1:b.mt.y,x2:b.rk.x,y2:b.rk.y,stroke:'#fff','stroke-width':1}));
+  b.q.forEach(p=>marks.appendChild(svg('rect',{x:p.x-5,y:p.y-5,width:10,height:10,fill:'#fff',stroke:'#000','stroke-width':1})));
+  marks.appendChild(svg('circle',{cx:b.rk.x,cy:b.rk.y,r:6,fill:'#fff',stroke:'#000','stroke-width':1}));
+}
+function hitLayerBox(e){ /* -> 'scale' | 'rot' | null, by screen distance to the handles */
+  const l=sel_(); if(!l||l.H) return null;
+  const r=vp.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top, b=layerBox(l);
+  if(Math.hypot(x-b.rk.x,y-b.rk.y)<=9) return 'rot';
+  if(b.q.some(p=>Math.abs(x-p.x)<=8&&Math.abs(y-p.y)<=8)) return 'scale';
+  return null;
+}
 function drawComps(){
   if(!comps.length&&!calib) return;
   const poly=(pts,fill,stroke,wd,dash,op)=>{
@@ -719,7 +752,7 @@ function drawComps(){
       fill:fill,stroke:stroke,'stroke-width':wd,opacity:op});
     if(dash)n.setAttribute('stroke-dasharray',dash);
     marks.appendChild(n); };
-  comps.forEach(c=>{
+  if(showComps) comps.forEach(c=>{
     if(!showSide[c.side])return;
     const g=compCorners(c), col=SIDECOL[c.side], isSel=c.id===selComp;
     const dash=c.side==='bot'?'4 3':null;
@@ -786,7 +819,7 @@ function drawComps(){
 }
 function hitComp(m){
   let best=null,bd=Infinity;
-  comps.forEach(c=>{ if(!showSide[c.side])return;
+  if(showComps) comps.forEach(c=>{ if(!showSide[c.side])return;
     const g=PKG[c.size], k=mmScale||1;
     const a=-(c.rot||0)*Math.PI/180, co=Math.cos(a), si=Math.sin(a);
     const dx=m.x-c.x, dy=m.y-c.y;
@@ -1076,6 +1109,8 @@ function renderNets(){
   nets.forEach(n=>{
     const row=document.createElement('div');
     row.className='net'+(n.id===activeNet?' active':'');
+    const grip=document.createElement('span'); grip.className='grip'; grip.textContent=n.id===activeNet?'▶':'';
+    grip.title='выделить нет';
     const col=document.createElement('input'); col.type='color'; col.value=n.color;
     col.oninput=e=>{n.color=e.target.value;drawMarks();save()};
     col.onclick=e=>e.stopPropagation();
@@ -1092,7 +1127,7 @@ function renderNets(){
       if(activeNet===n.id)activeNet=nets.length?nets[0].id:null;
       if(hlNet===n.id)hlNet=null; renderNets();drawMarks();sync();save()};
     row.onclick=()=>{ activeNet=n.id; hlNet=(hlNet===n.id?null:n.id); renderNets(); drawMarks(); sync(); };
-    row.append(col,nm,cnt,eye,del); box.appendChild(row);
+    row.append(grip,col,nm,cnt,eye,del); box.appendChild(row);
   });
 }
 function addNet(){
@@ -1102,7 +1137,7 @@ function addNet(){
 }
 function hitPoint(m){
   let best=null,bd=12/Math.abs(view.z);
-  points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
+  if(showNets) points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
     if(!net||!net.on||!lay||!ptShown(pt,lay))return;
     const w=worldOf(lay,pt.p), d=Math.hypot(w.x-m.x,w.y-m.y);
     if(d<bd){bd=d;best=pt;} });
@@ -1193,6 +1228,8 @@ function sync(){
   if(document.activeElement!==$('imgDir')) $('imgDir').value=imgDir;
   $('flipBoard').textContent='Плата: '+(boardSide==='top'?'TOP':'BOT')+' · перевернуть (F)';
   $('xrayBtn').classList.toggle('on',xray);
+  $('showNetsBtn').classList.toggle('on',showNets); $('showCompsBtn').classList.toggle('on',showComps);
+  if(clickMode!=='move') vp.style.cursor='';
   $('vrotv').textContent=view.rot+'°';
   $('vflipH').classList.toggle('on',!!view.fh); $('vflipV').classList.toggle('on',!!view.fv);
   const rs=$('refSel'); if(rs.value!==refId) rs.value=refId||'';
@@ -1209,7 +1246,7 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, warpModel, imgDir, projName};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
 }
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
@@ -1242,6 +1279,7 @@ function restore(s){
   compSide=s.compSide||'top'; compRot=+s.compRot||0;
   compVal=Object.assign({R:'',C:''},s.compVal||{});
   SIDECOL=Object.assign({...SIDECOL_DEF},s.sideCol||{});
+  showNets=s.showNets!==false; showComps=s.showComps!==false;
   showSide=Object.assign({top:true,bot:true},s.showSide||{});
   selComp=null; calib=null; warpModel=s.warpModel==='persp'?'persp':'affine';
   imgDir=typeof s.imgDir==='string'?s.imgDir:'pcb_overlay_img/';
@@ -1469,6 +1507,11 @@ vp.addEventListener('pointerdown',e=>{
   if(e.button!==0)return;
   if(e.target===handle){drag={t:'swipe'};vp.setPointerCapture(e.pointerId);return;}
   if(clickMode==='move'){
+    const hb=hitLayerBox(e);
+    if(hb){ const r=vp.getBoundingClientRect(), c=layerBox(s).c, px=e.clientX-r.left, py=e.clientY-r.top;
+      drag={t:'l'+hb,x:e.clientX,y:e.clientY,moved:false,cx:c.x,cy:c.y,
+        d0:Math.hypot(px-c.x,py-c.y)||1, a0:Math.atan2(py-c.y,px-c.x), osc:s.scale, orot:s.rot};
+      vp.setPointerCapture(e.pointerId); return; }
     if(s&&!s.H){ drag={t:'layer',x:e.clientX,y:e.clientY,moved:false,ox:s.x,oy:s.y};
       vp.classList.add('grabbing'); vp.setPointerCapture(e.pointerId); }
     return; }
@@ -1490,7 +1533,8 @@ vp.addEventListener('pointerdown',e=>{
   vp.setPointerCapture(e.pointerId);
 });
 vp.addEventListener('pointermove',e=>{
-  if(!drag)return;
+  if(!drag){ if(clickMode==='move'){ const h=hitLayerBox(e);
+      vp.style.cursor=h==='scale'?'nwse-resize':h==='rot'?'alias':''; } return; }
   if(drag.t==='swipe'){const r=vp.getBoundingClientRect();
     swipe=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)); applyClip(); save(); return;}
   const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
@@ -1499,6 +1543,14 @@ vp.addEventListener('pointermove',e=>{
   if(drag.t==='layer'){const s=sel_(); if(!s||s.H)return;
     const d=screenDelta(dx,dy);
     s.x=drag.ox+d.x; s.y=drag.oy+d.y; applyLayer(s); sync(); return;}
+  if(drag.t==='lscale'||drag.t==='lrot'){ const s=sel_(); if(!s||s.H)return;
+    const r=vp.getBoundingClientRect(), px=e.clientX-r.left-drag.cx, py=e.clientY-r.top-drag.cy;
+    if(drag.t==='lscale') s.scale=Math.max(.01,+(drag.osc*Math.hypot(px,py)/drag.d0).toFixed(4));
+    else { let da=(Math.atan2(py,px)-drag.a0)*180/Math.PI;
+      if(!!view.fh!==!!view.fv) da=-da;          /* mirrored view turns the other way */
+      let a=drag.orot+da; if(e.shiftKey) a=Math.round(a/15)*15;
+      s.rot=+((((a+180)%360+360)%360)-180).toFixed(2); }
+    applyLayer(s); sync(); return;}
   if(drag.t==='comp'){const c=comps.find(o=>o.id===drag.id); if(!c)return;
     const d=screenDelta(dx,dy); c.x=drag.ox+d.x; c.y=drag.oy+d.y; drawMarks(); save(); return;}
   if(drag.t==='calib'&&calib){const d=screenDelta(dx,dy);
@@ -1648,7 +1700,7 @@ $('kindC').onclick=()=>{compKind='C';syncComps()};
 $('compSize').onchange=e=>{compSize=e.target.value;syncComps();save()};
 $('compSide').onchange=e=>{compSide=e.target.value;syncComps();save()};
 $('compPick').onclick=()=>{ clickMode=clickMode==='comp'?'none':'comp';
-  if(clickMode==='comp')calib=null; sync();syncComps();drawMarks(); };
+  if(clickMode==='comp'){calib=null;showComps=true;} sync();syncComps();drawMarks(); };
 $('calBtn').onclick=()=>{ if(clickMode==='calib'){clickMode='none';calib=null;}
   else {clickMode='calib'; if(!mmScale) mmScale=sliderToScale(+$('calRange').value);}
   sync();syncComps();drawMarks(); };
@@ -1663,7 +1715,9 @@ $('showTop').onclick=()=>{showSide.top=!showSide.top;renderComps();drawMarks();s
 $('showBot').onclick=()=>{showSide.bot=!showSide.bot;renderComps();drawMarks();save()};
 $('addNet').onclick=addNet;
 $('netPickBtn').onclick=()=>{ if(!nets.length)addNet();
-  clickMode=clickMode==='net'?'none':'net'; sync();drawMarks()};
+  clickMode=clickMode==='net'?'none':'net'; if(clickMode==='net')showNets=true; sync();drawMarks()};
+$('showNetsBtn').onclick=()=>{showNets=!showNets;sync();drawMarks();save()};
+$('showCompsBtn').onclick=()=>{showComps=!showComps;sync();drawMarks();save()};
 $('delPoint').onclick=()=>{points=points.filter(p=>p.id!==selPoint);selPoint=null;renderNets();drawMarks();sync();save()};
 $('clearNetPts').onclick=()=>{points=points.filter(p=>p.net!==activeNet);selPoint=null;renderNets();drawMarks();sync();save()};
 $('labelsBtn').onclick=()=>{labels=!labels;sync();drawMarks();save()};
