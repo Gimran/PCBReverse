@@ -821,7 +821,8 @@ function addComp(m){
   const kind=compKind, des=kind+(compSeq[kind]++);
   const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
     kind, size:compSize, side:compSide, x:m.x, y:m.y, rot:compRot, des, val:compVal[kind]||'', n1:null, n2:null};
-  autoPins(c); comps.push(c); selComp=c.id; renderComps(); drawMarks(); save();
+  autoPins(c); comps.push(c);
+  if(!showSide[c.side]) showSide[c.side]=true; /* never place a part hidden by the filter */ selComp=c.id; renderComps(); drawMarks(); save();
 }
 function renderComps(){
   const box=$('complist'); box.innerHTML='';
@@ -1117,7 +1118,15 @@ function recompute(report){
 }
 
 /* ---------- sync ---------- */
+/* side for new parts follows the active layer's label (or the board side for "обе");
+   re-evaluated only when the active layer or board side changes, so a manual pick holds until then */
+let compSideKey='';
+function autoCompSide(){
+  const l=sel_(), k=(l?l.id+l.side:'')+'|'+boardSide; if(k===compSideKey) return;
+  compSideKey=k; compSide=(l&&(l.side==='top'||l.side==='bot'))?l.side:boardSide;
+}
 function sync(){
+  autoCompSide();
   const s=sel_(), r=byId(refId);
   const warped=!!(s&&s.H);
   $('rot').disabled=$('scl').disabled=warped||!s;
