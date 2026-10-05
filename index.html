@@ -123,6 +123,12 @@ button.wide{width:100%}
 .layer.off{opacity:.5}
 .layer.sub{margin-left:16px;border-left:3px solid var(--line)}
 .layer.sub .lname::before{content:"↳ ";color:var(--muted)}
+.actl{display:grid;grid-template-columns:1fr auto;gap:6px 8px;align-items:center;padding-top:8px;border-top:1px solid var(--line)}
+.actl .abtn{display:grid;grid-template-columns:36px 36px;gap:5px}
+.actl .abtn .mini{padding:3px 0}
+.actl .alab{flex:none;width:26px;text-transform:none;font-size:12px}
+.actl select.mini-sel{width:auto;flex:none;padding:1px 2px;font-size:10.5px;height:22px}
+.actl input[type=color]{width:26px;height:22px;flex:none}
 .lsep{display:flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:10px;
   letter-spacing:.08em;color:var(--muted);margin:2px 0 -2px}
 .lsep::before,.lsep::after{content:"";flex:1;border-top:1px solid var(--line)}
@@ -416,6 +422,18 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           </div>
           <div class="row"><span class="lbl" style="flex:none">Опора</span>
             <select id="refSel" class="slim"></select></div>
+          <div class="actl" title="настройки активного слоя">
+            <div class="row"><span class="lbl alab">α</span>
+              <input type="range" id="aOp" min="0" max="100" value="100"><span class="val" id="aOpV">100%</span>
+              <select id="aBlend" class="slim mini-sel"></select></div>
+            <div class="abtn"><button class="mini" id="aFh" title="отразить по горизонтали">⇄</button>
+              <button class="mini" id="aFv" title="отразить по вертикали">⇅</button></div>
+            <div class="row"><input type="color" id="aTc" title="цвет слоя (метка) и тонировки">
+              <input type="range" id="aTn" min="0" max="100" value="0"><span class="val" id="aTnV">0%</span>
+              <select id="aTm" class="slim mini-sel" title="режим тонировки"></select></div>
+            <div class="abtn"><button class="mini" id="aRl" title="повернуть −90°">↺</button>
+              <button class="mini" id="aRr" title="повернуть +90°">↻</button></div>
+          </div>
         </div>
 
         <div class="sect" id="layerCards" style="gap:6px;padding:10px 12px"></div>
@@ -1258,46 +1276,6 @@ function renderCards(){
     head.append(sw,nm,sl,sSel,up,dn,eye,del);
 
     const body=document.createElement('div'); body.className='lbody';
-    const mkSel=(opts,val,title,dis)=>{ const x=document.createElement('select'); x.className='slim mini-sel';
-      opts.forEach(([v,t,full])=>{const o=document.createElement('option');o.value=v;o.textContent=t;
-        if(full)o.title=full; x.appendChild(o)}); x.value=val; x.title=title; x.disabled=!!dis; return x; };
-
-    const r1=document.createElement('div'); r1.className='row';
-    const al=document.createElement('span'); al.className='lbl'; al.style.flex='none'; al.style.width='24px';
-    al.style.textTransform='none'; al.style.fontSize='12px'; al.textContent='α';
-    const op=document.createElement('input'); op.type='range'; op.min=0; op.max=100; op.value=Math.round(l.op*100);
-    const opv=document.createElement('span'); opv.className='val'; opv.textContent=op.value+'%';
-    op.oninput=()=>{l.op=op.value/100;opv.textContent=op.value+'%';applyLayer(l)};
-    const bl=mkSel(BLENDS.map(([v,t])=>[v,BLENDS_SHORT[v]||t,t]), l.blend,
-      i===0?'нижний слой смешивать не с чем':'режим наложения на нижележащие слои', i===0);
-    bl.onchange=()=>{l.blend=bl.value;applyLayer(l);save()};
-    r1.append(al,op,opv,bl);
-
-    const r2=document.createElement('div'); r2.className='row';
-    const tc=document.createElement('input'); tc.type='color'; tc.value=l.tc; tc.title='цвет слоя (метка) и тонировки';
-    tc.oninput=()=>{l.tc=l.color=tc.value;applyTint(l);save();  /* layer colour = tint colour; repaint swatches in place */
-      document.querySelectorAll(`.swatch[data-lid="${l.id}"]`).forEach(x=>x.style.background=l.tc);};
-    const tn=document.createElement('input'); tn.type='range'; tn.min=0; tn.max=100; tn.value=Math.round(l.tn*100);
-    const tnv=document.createElement('span'); tnv.className='val'; tnv.textContent=tn.value+'%';
-    tn.oninput=()=>{l.tn=tn.value/100;tnv.textContent=tn.value+'%';applyTint(l);save()};
-    const tm=mkSel(TINTS, l.tm||tintMode, 'режим тонировки');
-    tm.onchange=()=>{l.tm=tm.value;applyTint(l);save()};
-    r2.append(tc,tn,tnv,tm);
-
-    const r3=document.createElement('div'); r3.className='row r3';
-    [['⇄','fh','отразить по горизонтали'],['⇅','fv','отразить по вертикали'],
-     ['↺','rl','повернуть −90°'],['↻','rr','повернуть +90°']].forEach(([t,a,tt])=>{
-      const b=document.createElement('button'); b.className='mini xbtn'; b.textContent=t; b.title=tt;
-      if((a==='fh'&&l.fh)||(a==='fv'&&l.fv)) b.classList.add('on');
-      b.onclick=()=>{ if(l.H){l.H=null;warpInfo='';}
-        if(a==='fh')l.fh=!l.fh; if(a==='fv')l.fv=!l.fv;
-        if(a==='rl')l.rot=Math.round((l.rot-90)*10)/10;
-        if(a==='rr')l.rot=Math.round((l.rot+90)*10)/10;
-        if(l.rot>180)l.rot-=360; if(l.rot<-180)l.rot+=360;
-        applyLayer(l); renderCards(); sync(); };
-      r3.appendChild(b);
-    });
-    body.append(r1,r2,r3);
     if(!l.ok){ /* image missing: the only place to pick a file now */
       const rm=document.createElement('div'); rm.className='row';
       const tx=document.createElement('span'); tx.className='bad'; tx.style.flex='1'; tx.style.fontSize='11px';
@@ -1305,7 +1283,7 @@ function renderCards(){
       const bf=document.createElement('button'); bf.className='mini'; bf.textContent='Выбрать файл…';
       bf.title='картинка с диска; оригинал хранится в браузере и в проекте'; bf.onclick=()=>{ browseTarget=l.id; $('fileImg').click(); };
       rm.append(tx,bf); body.appendChild(rm); }
-    card.append(head,body); box.appendChild(card);
+    card.append(head); if(body.childNodes.length) card.appendChild(body); box.appendChild(card);
   });
   const rs=$('refSel'); rs.innerHTML='';
   layers.forEach(l=>{ const o=document.createElement('option'); o.value=l.id;
@@ -1517,6 +1495,7 @@ function sync(){
   $('invBtn').classList.toggle('on',inverted);
   $('flipBoard').textContent='Плата: '+(boardSide==='top'?'TOP':'BOT')+' · перевернуть (F)';
   $('xrayBtn').classList.toggle('on',xray);
+  syncActl();
   { const l=sel_(); ['keyOn','keyCol','keyPick','keyTol'].forEach(i=>$(i).disabled=!l);
     if(l){ $('keyOn').classList.toggle('on',!!l.kOn); $('keyCol').value=l.kc;
       $('keyTol').value=Math.round(l.kt*100); $('keyTolv').textContent=Math.round(l.kt*100)+'%'; }
@@ -2070,9 +2049,33 @@ function syncCor(){ const s=sel_();
 const corPreset=a=>{ const s=sel_(); if(!s)return; s.cor={...COR0,...a}; applyTint(s); syncCor(); save(); };
 $('corText').onclick=()=>corPreset({sat:0,ct:1.8,sh:.6});
 $('corTextCol').onclick=()=>{ const s=sel_(); if(!s)return;  /* coloured labels: also sets the layer's own tint */
-  s.tm='screen'; s.tn=1; corPreset({sat:0,ct:1.8,sh:.6,lb:1}); renderCards(); };
+  s.tm='screen'; s.tn=1; corPreset({sat:0,ct:1.8,sh:.6,lb:1}); renderCards(); sync(); };
 $('corThr').onclick=()=>corPreset({sat:0,ct:1.6,pz:2});
 $('corReset').onclick=()=>corPreset({});
+/* СЛОИ header: α / blend / tint / flips / rotations of the active layer */
+BLENDS.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=BLENDS_SHORT[v]||t; o.title=t; $('aBlend').appendChild(o); });
+TINTS.forEach(([v,t,full])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; if(full)o.title=full; $('aTm').appendChild(o); });
+function syncActl(){ const l=sel_(), ids=['aOp','aBlend','aTc','aTn','aTm','aFh','aFv','aRl','aRr'];
+  ids.forEach(i=>$(i).disabled=!l); if(!l) return;
+  const keep=i=>document.activeElement!==$(i);
+  if(keep('aOp')) $('aOp').value=Math.round(l.op*100); $('aOpV').textContent=Math.round(l.op*100)+'%';
+  $('aBlend').value=l.blend; $('aBlend').disabled=idx(l.id)===0;
+  $('aBlend').title=idx(l.id)===0?'нижний слой смешивать не с чем':'режим наложения на нижележащие слои';
+  if(keep('aTc')) $('aTc').value=l.tc;
+  if(keep('aTn')) $('aTn').value=Math.round(l.tn*100); $('aTnV').textContent=Math.round(l.tn*100)+'%';
+  $('aTm').value=l.tm||tintMode;
+  $('aFh').classList.toggle('on',!!l.fh); $('aFv').classList.toggle('on',!!l.fv); }
+const actl=fn=>()=>{ const l=sel_(); if(l) fn(l); };
+$('aOp').oninput=actl(l=>{ l.op=$('aOp').value/100; $('aOpV').textContent=$('aOp').value+'%'; applyLayer(l); renderVideo(); });
+$('aBlend').onchange=actl(l=>{ l.blend=$('aBlend').value; applyLayer(l); save(); });
+$('aTc').oninput=actl(l=>{ l.tc=l.color=$('aTc').value; applyTint(l); save();   /* layer colour = tint colour */
+  document.querySelectorAll(`.swatch[data-lid="${l.id}"]`).forEach(x=>x.style.background=l.tc); });
+$('aTn').oninput=actl(l=>{ l.tn=$('aTn').value/100; $('aTnV').textContent=$('aTn').value+'%'; applyTint(l); save(); });
+$('aTm').onchange=actl(l=>{ l.tm=$('aTm').value; applyTint(l); save(); });
+const aXf=fn=>actl(l=>{ if(l.H){l.H=null;warpInfo='';} fn(l);
+  if(l.rot>180)l.rot-=360; if(l.rot<-180)l.rot+=360; applyLayer(l); renderVideo(); sync(); });
+$('aFh').onclick=aXf(l=>l.fh=!l.fh); $('aFv').onclick=aXf(l=>l.fv=!l.fv);
+$('aRl').onclick=aXf(l=>l.rot=Math.round((l.rot-90)*10)/10); $('aRr').onclick=aXf(l=>l.rot=Math.round((l.rot+90)*10)/10);
 $('keyOn').onclick=()=>{ const l=sel_(); if(!l)return; l.kOn=!l.kOn; applyLayer(l); sync(); };
 $('keyCol').oninput=e=>{ const l=sel_(); if(!l)return; l.kc=e.target.value; l.kOn=true; applyLayer(l); sync(); };
 $('keyTol').oninput=e=>{ const l=sel_(); if(!l)return; l.kt=+e.target.value/100; applyLayer(l); sync(); };
