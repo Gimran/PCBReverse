@@ -97,6 +97,7 @@ svg.marks{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visi
   border-bottom:2px solid transparent}
 .tabs button.on{color:var(--text);border-bottom-color:var(--text);background:transparent}
 .pages{overflow-y:auto;flex:1;min-height:0}
+[data-page="nets"]>.sect:first-child{position:sticky;top:0;z-index:3;background:var(--panel)}
 .sect{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
 .sect:last-child{border-bottom:0}
 .lbl{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
@@ -116,6 +117,8 @@ button.wide{width:100%}
 .layer{border:1px solid var(--line);border-radius:5px;background:var(--panel-2);overflow:hidden}
 .layer.sel{border-color:var(--text);box-shadow:inset 3px 0 0 var(--text)}
 .layer.off{opacity:.5}
+.layer.sub{margin-left:16px;border-left:3px solid var(--line)}
+.layer.sub .lname::before{content:"↳ ";color:var(--muted)}
 .lsep{display:flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:10px;
   letter-spacing:.08em;color:var(--muted);margin:2px 0 -2px}
 .lsep::before,.lsep::after{content:"";flex:1;border-top:1px solid var(--line)}
@@ -212,7 +215,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="xrayBtn" title="рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы">XRAY</button>
           </div>
           <div class="row"><span class="lbl" style="flex:none">Показать</span>
-            <button class="mini on" id="showNetsBtn" style="flex:1" title="точки всех нетов">неты</button>
+            <button class="mini on" id="showNetsBtn" style="flex:1" title="точки всех NET">NETS</button>
             <button class="mini on" id="showCompsBtn" style="flex:1" title="все компоненты">компоненты</button>
           </div>
           <div class="row"><span class="lbl" style="flex:none">Вид</span>
@@ -246,6 +249,9 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="rstLayer">сброс слоя</button>
             <button class="mini" id="rstCrop">сброс кропа</button>
           </div>
+          <div class="row" title="размытие краёв слоя (внутри кропа) — заплатки без резкой рамки">
+            <span class="lbl" style="flex:none;width:40px">края</span>
+            <input type="range" id="feR" min="0" max="50" step="1" value="0"><span class="val" id="feV">0%</span></div>
         </div>
         <div class="sect">
           <div class="lbl">Удаление фона</div>
@@ -296,7 +302,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>колесо</b> — зум · <b>средняя кнопка</b> — панорама<br><b>R</b> / <b>Shift+R</b> — поворот вида на 90°<br><b>H</b> / <b>V</b> — отражение вида<br>
             <b>M</b> — сдвиг слоя мышью и стрелками<br><b>F</b> — переворот платы<br>
             <b>[ ]</b> — поворот 0.1° · <b>Shift</b> — ×10<br>
-            <b>P</b> — опорные точки · <b>N</b> — редактирование нетов · <b>K</b> — редактирование компонентов<br>
+            <b>P</b> — опорные точки · <b>N</b> — редактирование NET · <b>K</b> — редактирование компонентов<br>
             <b>Alt+клик</b> в режиме N — переходное отверстие (точка на обеих сторонах)<br>
             <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> / <b>Delete</b> — удалить (только в режимах N / K) · <b>Esc</b> — выход
           </div>
@@ -374,7 +380,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
   <div class="panel">
     <div class="tabs">
       <button class="on" data-tab="view">СЛОИ</button>
-      <button data-tab="nets">НЕТЫ</button>
+      <button data-tab="nets">NETS</button>
       <button data-tab="data">ФАЙЛЫ</button>
     </div>
 
@@ -398,17 +404,17 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 
       <div data-page="nets" hidden>
         <div class="sect">
-          <button class="mini wide" id="netPickBtn">Редактирование нетов (N)</button>
+          <button class="mini wide" id="netPickBtn">Редактирование NET (N)</button>
           <div class="status" id="netStatus"></div>
-          <div class="modes two">
-            <button class="mini" id="addNet">+ нет</button>
-            <button class="mini" id="delPoint" disabled>Удалить точку</button>
-            <button class="mini" id="clearNetPts" disabled>Очистить нет</button>
-            <button class="mini on" id="labelsBtn">подписи</button>
+          <div class="modes">
+            <button class="mini" id="addNet" title="новый NET">+ NET</button>
+            <button class="mini" id="delPoint" disabled title="удалить выбранную точку">− точка</button>
+            <button class="mini" id="clearNetPts" disabled title="удалить все точки активного NET">очистить</button>
+            <button class="mini on" id="labelsBtn" title="подписи точек">подписи</button>
           </div>
         </div>
         <div class="sect">
-          <div class="lbl">Неты · клик подсвечивает точки</div>
+          <div class="lbl">NETS · клик подсвечивает точки</div>
           <div class="netlist" id="netlist"></div>
         </div>
       </div>
@@ -419,7 +425,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
             <button class="mini" id="addVideo" title="экспериментально: изображение с камеры / USB-микроскопа как слой">+ Видеослой</button>
           </div>
-          <div class="status">Слой удаляется кнопкой ✕ в его строке — вместе со своими точками нетов и опорными парами.</div>
+          <div class="status">Слой удаляется кнопкой ✕ в его строке — вместе со своими точками NET и опорными парами.</div>
           <div class="row"><span class="lbl" style="flex:none">Папка картинок</span>
             <input type="text" class="path" id="imgDir" spellcheck="false"
               title="куда смотрят «Выбрать файл…» и «Перечитать файл»; относительно html"></div>
@@ -440,7 +446,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           </div>
           <div class="keys">
             <b>Проект *.pcbr</b> — zip без сжатия: project.json<br>
-            (слои, деформация, неты, компоненты, вид) + оригиналы картинок.<br>
+            (слои, деформация, NET, компоненты, вид) + оригиналы картинок.<br>
             «Выбрать файл…» — оригинал хранится в браузере (IndexedDB);<br>
             путь записывается как <b>папка картинок + имя файла</b>.<br>
             «Перечитать файл» — загрузить по пути с диска заново.
@@ -505,7 +511,7 @@ function mkLayer(i,init){
     id, name:'Слой '+(i+1), color:LAYPAL[i%LAYPAL.length], side:'any',
     src:'', stored:false, ok:false,
     x:0,y:0,rot:0,scale:1,fh:false,fv:false,op:1,on:true,H:null,
-    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15, cor:{...COR0}, crop:null,
+    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15, cor:{...COR0}, crop:null, main:false, parent:null, fe:0,
     w:1200,h:1200, pairs:[]
   },init||{});
   const clip=document.createElement('div'); clip.className='clip'; clip.dataset.id=id;
@@ -561,6 +567,9 @@ const SIDE_RANK={any:0,bot:1,top:2};
 const grp=l=>SIDE_RANK[l.side]??0;
 function restack(){
   layers=layers.map((l,i)=>[l,i]).sort((a,b)=>grp(a[0])-grp(b[0])||a[1]-b[1]).map(x=>x[0]);
+  const kids=layers.filter(l=>parentOf(l)), tops=layers.filter(l=>!parentOf(l)), out=[];
+  tops.forEach(t=>{ out.push(t); kids.filter(k=>k.parent===t.id).forEach(k=>out.push(k)); });
+  layers=out;
   layers.forEach((l,i)=>{ l.clip.style.zIndex=i+1; stack.appendChild(l.clip); });
 }
 function layersChanged(){
@@ -575,6 +584,15 @@ function addLayer(){ /* new layer on the current board side, top of its group, b
   const l=mkLayer(n-1,{side:boardSide}); l.name='Слой '+n;
   layers.push(l); sel=l.id; layersChanged(); return l;
 }
+/* soft edges: two linear gradients intersected, positions in element px */
+function featherMask(x0,y0,x1,y1,f){
+  if(!(f>0)) return 'none';
+  const g=(dir,a,b)=>`linear-gradient(${dir}, transparent ${a}px, #000 ${a+f}px, #000 ${b-f}px, transparent ${b}px)`;
+  return g('to right',x0,x1)+', '+g('to bottom',y0,y1);
+}
+function setMask(el,m){ el.style.maskImage=el.style.webkitMaskImage=m;
+  el.style.maskComposite='intersect'; el.style.webkitMaskComposite='source-in';
+  el.style.maskRepeat=el.style.webkitMaskRepeat='no-repeat'; }
 /* ---------- video layer (experimental): camera / USB microscope via getUserMedia ----------
    the <video> sits in the layer box instead of the <img>; geometry, warp, crop, key, correction, tint all apply */
 function attachVideo(l){
@@ -600,22 +618,38 @@ function stopCam(l){ if(l.stream){ l.stream.getTracks().forEach(t=>t.stop()); l.
 let camList=[];
 async function listCams(){ try{ camList=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'); }catch(err){} }
 function addVideoLayer(){
-  const l=addLayer(); l.kind='video'; l.name='Видео '+l.id.slice(1); attachVideo(l); startCam(l); return l;
+  const l=addLayer(); l.kind='video'; l.name='Видео '+l.id.slice(1); l.fe=.15; attachVideo(l); startCam(l); return l;
 }
 function snapLayer(l){ /* freeze the current frame into a new image layer at the same place */
   const v=l.vid; if(!v||!v.videoWidth) return;
   const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
   c.getContext('2d').drawImage(v,0,0);
   c.toBlob(b=>{ if(!b) return;
-    const n=addLayer(), keep=['x','y','rot','scale','fh','fv','side','H','crop'];
+    const n=addLayer(), keep=['x','y','rot','scale','fh','fv','side','H','crop','fe'];
     keep.forEach(k=>n[k]=JSON.parse(JSON.stringify(l[k]??null))); n.cor={...l.cor};
     n.name='Снимок '+new Date().toLocaleTimeString('ru-RU');
     storeFile(n.id,new File([b],'micro_'+Date.now()+'.png',{type:'image/png'}));
     layersChanged();
   },'image/png');
 }
+function mainOf(side){ return layers.find(x=>x.main&&x.side===side&&x.kind!=='video'); }
+function snapPatch(l){ /* frame -> image layer at the same place, sub-layer of the side's main layer (TOP main / BOT main) */
+  const side=(l.side==='top'||l.side==='bot')?l.side:boardSide, M=mainOf(side);
+  if(!M){ l.camErr='нет главного слоя — поставьте метку «'+side.toUpperCase()+' main»'; renderFiles(); return; }
+  const v=l.vid; if(!v||!v.videoWidth) return;
+  const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  c.toBlob(b=>{ if(!b) return;
+    const n=addLayer(), keep=['x','y','rot','scale','fh','fv','H','crop','fe'];
+    keep.forEach(k=>n[k]=JSON.parse(JSON.stringify(l[k]??null))); n.cor={...l.cor};
+    n.side=M.side; n.parent=M.id; n.name='патч '+new Date().toLocaleTimeString('ru-RU');
+    storeFile(n.id,new File([b],'patch_'+Date.now()+'.png',{type:'image/png'}));
+    l.camErr=''; layersChanged();
+  },'image/png');
+}
 function removeLayer(l){
   if(layers.length<=1) return;
+  layers.forEach(o=>{ if(o.parent===l.id) o.parent=null; });
   stopCam(l);
   layers=layers.filter(x=>x!==l);
   points=points.filter(p=>p.layer!==l.id);
@@ -714,7 +748,8 @@ function fitTransform(src,dst,opt){
 const ptShown=(pt,lay)=>!!pt.via||layerShown(lay);
 function layerShown(l){
   if(!l.on||!onSide(l)) return false;
-  if(viewMode==='solo') return l.id===sel;
+  const P=parentOf(l); if(P&&!P.on) return false;
+  if(viewMode==='solo') return l.id===sel||(!!P&&P.id===sel);
   if(viewMode==='swipe') return l.id===sel||l.id===refId;
   return true;
 }
@@ -760,6 +795,7 @@ function applyLayer(l){
   const cr=l.crop;
   l.el.style.clipPath = cr ? `inset(${cr.y0}px ${l.w-cr.x1}px ${l.h-cr.y1}px ${cr.x0}px)` : 'none';
   if(l.vid) l.vid.style.clipPath=l.el.style.clipPath;
+  { const c=cropRect(l); setMask(l.vid||l.el,featherMask(c.x0,c.y0,c.x1,c.y1,(l.fe||0)*Math.min(c.x1-c.x0,c.y1-c.y0))); }
   const o=effOpacity(l);
   l.box.style.setProperty('--op',o); l.box.style.opacity=o;
   l.box.style.filter=inverted?'invert(1) hue-rotate(180deg)':'none';
@@ -1103,7 +1139,7 @@ function renderProps(){
   rot.append(rl,rr,rv); mkRow('угол',rot);
   [['вывод 1','n1'],['вывод 2','n2']].forEach(([lab,key])=>{
     const s2=document.createElement('select'); s2.className='slim';
-    const o0=document.createElement('option'); o0.value=''; o0.textContent='— нет —'; s2.appendChild(o0);
+    const o0=document.createElement('option'); o0.value=''; o0.textContent='—'; s2.appendChild(o0);
     nets.forEach(n=>{const o=document.createElement('option');o.value=n.id;o.textContent=n.name;s2.appendChild(o)});
     s2.value=c[key]||'';
     s2.onchange=()=>{c[key]=s2.value||null;drawMarks();save()};
@@ -1169,6 +1205,21 @@ const TINTS=[['color','цвет','цвет (сохраняет яркость)']
 const BLENDS_SHORT={normal:'норм',difference:'разн',screen:'осв',multiply:'умн',exclusion:'искл'};
 const BLENDS=[['normal','обычное'],['difference','разность'],['screen','осветление'],
               ['multiply','умножение'],['exclusion','исключение']];
+/* side label selector; "TOP main"/"BOT main" = main layer of that side (one per side); microscope snapshots
+   become its sub-layers (l.parent). Changing a sub-layer to another side detaches it. */
+function sideSel(l){
+  const x=document.createElement('select'); x.className='slim tagsel'; x.title='сторона (метка) слоя; main — главный слой стороны';
+  [['any','обе'],['top','TOP'],['bot','BOT'],['top-main','TOP main'],['bot-main','BOT main']].forEach(([v,t])=>{
+    const o=document.createElement('option'); o.value=v; o.textContent=t; x.appendChild(o); });
+  x.value=(l.side||'any')+(l.main&&l.side!=='any'?'-main':'');
+  x.onchange=()=>{ const [sd,m]=x.value.split('-'); l.side=sd; l.main=!!m;
+    if(l.main){ l.parent=null; layers.forEach(o=>{ if(o!==l&&o.side===sd) o.main=false; }); }
+    const P=l.parent&&byId(l.parent); if(P&&P.side!==sd) l.parent=null;
+    layers.forEach(o=>{ if(o.parent===l.id) o.side=l.side; });   /* sub-layers follow their parent's side */
+    restack(); renderCards(); renderFiles(); applyAll(); sync(); save(); };
+  return x;
+}
+const parentOf=l=>l.parent?byId(l.parent):null;
 function renderCards(){
   const box=$('layerCards'); box.innerHTML='';
   let lastG=null;
@@ -1177,7 +1228,7 @@ function renderCards(){
     if(grp(l)!==lastG){ lastG=grp(l); const sp=document.createElement('div'); sp.className='lsep';
       sp.textContent=['обе','BOT','TOP'][lastG]; box.appendChild(sp); }
     const card=document.createElement('div');
-    card.className='layer'+(l.id===sel?' sel':'')+
+    card.className='layer'+(parentOf(l)?' sub':'')+(l.id===sel?' sel':'')+
       ((l.on && onSide(l))?'':' off');
     const head=document.createElement('div'); head.className='lhead';
     const pick=e=>{ if(/INPUT|BUTTON|SELECT|OPTION/.test(e.target.tagName))return;
@@ -1188,17 +1239,16 @@ function renderCards(){
     const nm=document.createElement('span'); nm.className='lname lname-ro'; nm.textContent=l.name;
     nm.title='имя меняется во вкладке ФАЙЛЫ';
     const sl=document.createElement('span'); sl.className='lbl tag'; sl.textContent='метка';
-    const sSel=document.createElement('select'); sSel.className='slim tagsel';
-    [['any','обе'],['top','TOP'],['bot','BOT']].forEach(([v,t])=>{
-      const o=document.createElement('option'); o.value=v; o.textContent=t; sSel.appendChild(o); });
-    sSel.value=l.side||'any';
-    sSel.onchange=()=>{ l.side=sSel.value; restack(); renderCards(); renderFiles(); applyAll(); sync(); save(); };
+    const sSel=sideSel(l);
     const up=document.createElement('button'); up.className='ibtn'; up.textContent='▲'; up.title='выше';
-    up.disabled=i===layers.length-1||grp(layers[i+1])!==grp(l);
-    up.onclick=()=>{ layers.splice(i,1); layers.splice(i+1,0,l); restack(); renderCards(); applyAll(); save(); };
+    const peers=layers.filter(o=>grp(o)===grp(l)&&(parentOf(l)?o.parent===l.parent:!parentOf(o))), pi=peers.indexOf(l);
+    const swap=o=>{ const a=layers.indexOf(l), b=layers.indexOf(o); layers[a]=o; layers[b]=l;
+      restack(); renderCards(); renderFiles(); applyAll(); save(); };
+    up.disabled=pi>=peers.length-1;
+    up.onclick=()=>swap(peers[pi+1]);
     const dn=document.createElement('button'); dn.className='ibtn'; dn.textContent='▼'; dn.title='ниже';
-    dn.disabled=i===0||grp(layers[i-1])!==grp(l);
-    dn.onclick=()=>{ layers.splice(i,1); layers.splice(i-1,0,l); restack(); renderCards(); applyAll(); save(); };
+    dn.disabled=pi<=0;
+    dn.onclick=()=>swap(peers[pi-1]);
     const eye=document.createElement('button'); eye.className='ibtn'; eye.textContent=l.on?'●':'○';
     eye.title='видимость';
     eye.onclick=()=>{l.on=!l.on;renderCards();applyAll();sync()};
@@ -1263,15 +1313,11 @@ function renderFiles(){
     const t=document.createElement('input'); t.type='text'; t.className='lname'; t.value=l.name;
     t.spellcheck=false; t.placeholder='имя слоя';
     t.oninput=e=>{ l.name=e.target.value; l.el.alt=e.target.value; renderCards(); sync(); save(); };
-    const sd=document.createElement('select'); sd.className='slim tagsel'; sd.title='сторона (метка) слоя';
-    [['any','обе'],['top','TOP'],['bot','BOT']].forEach(([v,tx])=>{
-      const o=document.createElement('option'); o.value=v; o.textContent=tx; sd.appendChild(o); });
-    sd.value=l.side||'any'; sd.style.width='auto'; sd.style.flex='none';
-    sd.onchange=()=>{ l.side=sd.value; restack(); renderCards(); renderFiles(); applyAll(); sync(); save(); };
+    const sd=sideSel(l); sd.style.width='auto'; sd.style.flex='none';
     const del=document.createElement('button'); del.className='ibtn'; del.textContent='✕'; del.title='удалить слой';
     del.disabled=layers.length<=1;
     del.onclick=()=>{ const np=points.filter(p=>p.layer===l.id).length;
-      if(confirm('Удалить слой «'+l.name+'»'+(np?' и его точки нетов ('+np+')':'')+'?')) removeLayer(l); };
+      if(confirm('Удалить слой «'+l.name+'»'+(np?' и его точки NET ('+np+')':'')+'?')) removeLayer(l); };
     cap.append(sw,t,sd,del);
     if(l.kind==='video'){
       const cs=document.createElement('select'); cs.className='slim'; cs.title='камера';
@@ -1282,15 +1328,26 @@ function renderFiles(){
       const v=l.vid, live=!!l.stream;
       st.innerHTML = live ? `<span class="good">видео идёт</span> · ${v.videoWidth}×${v.videoHeight}`
         : '<span class="bad">'+(l.camErr||'камера остановлена')+'</span>';
-      const btns=document.createElement('div'); btns.className='modes three';
+      const fr=document.createElement('div'); fr.className='row';
+      const fl=document.createElement('span'); fl.className='lbl'; fl.style.flex='none'; fl.textContent='края';
+      const fi=document.createElement('input'); fi.type='range'; fi.min=0; fi.max=50; fi.value=Math.round((l.fe||0)*100);
+      fi.title='размытие краёв кадра (участок задаёт кроп слоя); переходит в снимок';
+      const fv=document.createElement('span'); fv.className='val'; fv.textContent=fi.value+'%';
+      fi.oninput=()=>{ l.fe=fi.value/100; fv.textContent=fi.value+'%'; applyLayer(l); sync(); };
+      fr.append(fl,fi,fv);
+      const btns=document.createElement('div'); btns.className='modes two';
       const b1=document.createElement('button'); b1.className='mini'; b1.textContent=live?'Стоп':'Старт';
       b1.onclick=()=>{ if(l.stream){ stopCam(l); renderFiles(); } else startCam(l); };
+      const sd2=(l.side==='top'||l.side==='bot')?l.side:boardSide, M=mainOf(sd2);
+      const b4=document.createElement('button'); b4.className='mini'; b4.textContent='Снимок → '+sd2.toUpperCase()+' main';
+      b4.title='кадр — подслоем главного слоя стороны'+(M?' «'+M.name+'»':' (не назначен: метка «'+sd2.toUpperCase()+' main»)');
+      b4.disabled=!live||!M; b4.onclick=()=>snapPatch(l);
       const b2=document.createElement('button'); b2.className='mini'; b2.textContent='Снимок в слой';
-      b2.title='текущий кадр — новым слоем-картинкой на том же месте'; b2.disabled=!live; b2.onclick=()=>snapLayer(l);
+      b2.title='текущий кадр — отдельным слоем-картинкой на том же месте'; b2.disabled=!live; b2.onclick=()=>snapLayer(l);
       const b3=document.createElement('button'); b3.className='mini'; b3.textContent='обновить список';
       b3.onclick=async()=>{ await listCams(); renderFiles(); };
-      btns.append(b1,b2,b3);
-      row.append(cap,cs,st,btns); box.appendChild(row); return;
+      btns.append(b1,b4,b2,b3);
+      row.append(cap,cs,st,fr,btns); box.appendChild(row); return;
     }
     const path=document.createElement('input'); path.type='text'; path.className='path'; path.value=l.src;
     path.spellcheck=false;
@@ -1314,12 +1371,12 @@ function renderFiles(){
 function renderNets(){
   const box=$('netlist'); box.innerHTML='';
   if(!nets.length){ const d=document.createElement('div'); d.className='empty';
-    d.textContent='Нетов пока нет — нажмите «+ нет».'; box.appendChild(d); return; }
+    d.textContent='NET пока нет — нажмите «+ NET».'; box.appendChild(d); return; }
   nets.forEach(n=>{
     const row=document.createElement('div');
     row.className='net'+(n.id===activeNet?' active':'');
     const grip=document.createElement('span'); grip.className='grip'; grip.textContent=n.id===activeNet?'▶':'';
-    grip.title='выделить нет';
+    grip.title='выделить NET';
     const col=document.createElement('input'); col.type='color'; col.value=n.color;
     col.oninput=e=>{n.color=e.target.value;drawMarks();save()};
     col.onclick=e=>e.stopPropagation();
@@ -1417,12 +1474,12 @@ function sync(){
 
   const netting=clickMode==='net', an=nets.find(n=>n.id===activeNet);
   $('netPickBtn').classList.toggle('on',netting);
-  $('netPickBtn').textContent='Редактирование нетов (N)';
+  $('netPickBtn').textContent='Редактирование NET (N)';
   $('delPoint').disabled=!netting||!selPoint; $('clearNetPts').disabled=!netting||!an||!points.some(p=>p.net===activeNet);
   if(compEditShown!==(clickMode==='comp')){ compEditShown=clickMode==='comp'; renderComps(); }
   $('labelsBtn').classList.toggle('on',labels);
-  $('netStatus').innerHTML= !an? 'Создайте нет, затем ставьте его точки на слоях.'
-    : `Активный нет: <b>${an.name}</b> · точек ${points.filter(p=>p.net===activeNet).length}<br>`+
+  $('netStatus').innerHTML= !an? 'Создайте NET, затем ставьте его точки на слоях.'
+    : `Активный NET: <b>${an.name}</b> · точек ${points.filter(p=>p.net===activeNet).length}<br>`+
       `Точки ставятся на слой <b>${s?s.name:'—'}</b>.`+(netting?' <b>Alt+клик</b> — переходное (видно с обеих сторон). Правый клик / Delete по точке — удалить.':'')+
       (hlNet?`<br><span class="good">подсвечен: ${nets.find(n=>n.id===hlNet).name}</span>`:'');
 
@@ -1436,6 +1493,8 @@ function sync(){
   $('moveBtn').classList.toggle('on',clickMode==='move');
   $('cropBtn').classList.toggle('on',clickMode==='crop'); $('cropBtn').disabled=!sel_();
   $('rstCrop').disabled=!(sel_()&&sel_().crop);
+  { const l=sel_(); $('feR').disabled=!l; if(l){ if(document.activeElement!==$('feR')) $('feR').value=Math.round((l.fe||0)*100);
+      $('feV').textContent=Math.round((l.fe||0)*100)+'%'; } }
   $('moveBtn').disabled=!!(sel_()&&sel_().H);
   $('gridBtn').classList.toggle('on',grid); vp.classList.toggle('nogrid',!grid);
   $('invBtn').classList.toggle('on',inverted);
@@ -1463,7 +1522,7 @@ function snapshot(){
     inverted, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.tc,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
-      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId})),
+      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,main:l.main,parent:l.parent,fe:l.fe})),
     nets, points, activeNet, netSeq,
     comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
 }
@@ -1483,7 +1542,7 @@ function restore(s){
     tc:d.tc||LAYPAL[i%LAYPAL.length], tn:typeof d.tn==='number'?d.tn:0,
     tm:d.tm||s.tintMode||'color',
     blend:d.blend||'normal', pairs:Array.isArray(d.pairs)?d.pairs:[],
-    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{}), crop:d.crop||null,
+    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{}), crop:d.crop||null, main:!!d.main, parent:d.parent||null, fe:+d.fe||0,
     ...(d.kind==='video'?{kind:'video',camId:d.camId||''}:{})});
     layers.push(l); });
   restack();
@@ -1903,6 +1962,7 @@ $('rstLayer').onclick=()=>{const s=sel_(); if(!s)return;
   s.x=s.y=s.rot=0;s.scale=1;s.H=null;warpInfo='';applyLayer(s);renderCards();sync()};
 $('cropBtn').onclick=()=>{ clickMode=clickMode==='crop'?'none':'crop';
   if(clickMode==='crop'){pending=null;calib=null;} sync();syncComps();drawMarks(); };
+$('feR').oninput=e=>{ const l=sel_(); if(!l)return; l.fe=+e.target.value/100; $('feV').textContent=e.target.value+'%'; applyLayer(l); };
 $('rstCrop').onclick=()=>{ const s=sel_(); if(!s)return; s.crop=null; applyLayer(s); sync(); };
 $('moveBtn').onclick=()=>{ clickMode=clickMode==='move'?'none':'move';
   if(clickMode==='move'){pending=null;calib=null;} sync();syncComps();drawMarks(); };
