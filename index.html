@@ -94,14 +94,14 @@ svg.marks{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visi
 .panel{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;position:relative}
 @media (max-width:880px){ .panel{border-left:0;border-top:1px solid var(--line)} }
 .phead{padding:13px 16px 11px;border-bottom:1px solid var(--line)}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line)}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
 .lpanel .tabs{grid-template-columns:repeat(4,1fr) 30px}
 .tabs button{border:0;border-radius:0;background:transparent;box-shadow:none;padding:9px 4px;
   font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.05em;color:var(--muted);
   border-bottom:2px solid transparent}
 .tabs button.on{color:var(--text);border-bottom-color:var(--text);background:transparent}
 .pages{overflow-y:auto;flex:1;min-height:0}
-[data-page="nets"]>.sect:first-child{position:sticky;top:0;z-index:3;background:var(--panel)}
+[data-page="nets"]>.sect:first-child,[data-page="view"]>.sect:first-child{position:sticky;top:0;z-index:3;background:var(--panel)}
 .sect{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
 .sect:last-child{border-bottom:0}
 .lbl{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
@@ -239,6 +239,20 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           </div>
           <button class="mini wide" id="invBtn">инверсия цветов</button>
         </div>
+        <div class="sect">
+          <div class="lbl">Состояние</div>
+          <div class="status" id="saveStatus">Автосохранение включено.</div>
+          <div class="row" id="missRow" hidden>
+            <button class="mini" id="missPick" style="flex:1">Указать файлы…</button>
+            <button class="mini" id="missSkip" style="flex:1">Сохранить без них</button>
+          </div>
+          <div class="modes two">
+            <button class="mini" id="projSave" title="*.pcbr — zip без сжатия: project.json (слои, деформация, NET, компоненты, вид) + оригиналы картинок">Сохранить проект</button>
+            <button class="mini" id="projLoad" title="открыть *.pcbr (или старый JSON-экспорт)">Загрузить проект</button>
+            <button class="mini" id="saveNow" title="записать состояние в браузер сейчас (автосохранение и так включено)">Сохранить сейчас</button>
+            <button class="mini" id="resetAll" title="очистить состояние и картинки в браузере и перезагрузить страницу">Сбросить всё</button>
+          </div>
+        </div>
       </div>
       <div data-lpage="layer" hidden>
         <div class="sect">
@@ -301,6 +315,8 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       <div data-lpage="keys" hidden>
         <div class="sect">
           <div class="keys">
+            Картинки по путям — в папке <b>pcb_overlay_img/</b> рядом с index.html;<br>
+            выбранные файлы хранятся в браузере и в проекте <b>*.pcbr</b>.<br><br>
             <b>1…8</b> — видимость слоя · <b>X</b> — следующий слой<br>
             <b>колесо</b> — зум · <b>средняя кнопка</b> — панорама<br><b>R</b> / <b>Shift+R</b> — поворот вида на 90°<br><b>H</b> / <b>V</b> — отражение вида<br>
             <b>M</b> — сдвиг слоя мышью и стрелками<br><b>F</b> — переворот платы<br>
@@ -385,13 +401,13 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
     <div class="tabs">
       <button class="on" data-tab="view">СЛОИ</button>
       <button data-tab="nets">NETS</button>
-      <button data-tab="data">ФАЙЛЫ</button>
       <button data-tab="video" title="экспериментально: камера / USB-микроскоп">ВИДЕО</button>
     </div>
 
     <div class="pages">
       <div data-page="view">
         <div class="sect">
+          <button class="mini wide" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
           <div class="lbl">Режим просмотра</div>
           <div class="modes three">
             <button class="mini on" data-vm="all">все</button>
@@ -427,29 +443,6 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       <div data-page="video" hidden>
         <div class="sect" id="vidRows" style="gap:8px"></div>
         <div class="sect" id="vidWinBox" hidden><video id="vidWin" muted playsinline autoplay></video></div>
-      </div>
-      <div data-page="data" hidden>
-        <div class="sect">
-          <button class="mini wide" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
-          <div class="row"><span class="lbl" style="flex:none">Папка картинок</span>
-            <input type="text" class="path" id="imgDir" spellcheck="false"
-              title="куда смотрят «Выбрать файл…» и «Перечитать файл»; относительно html"></div>
-        </div>
-        <div class="sect" id="fileRows" style="gap:8px"></div>
-        <div class="sect">
-          <div class="lbl">Состояние</div>
-          <div class="status" id="saveStatus">Автосохранение включено.</div>
-          <div class="row" id="missRow" hidden>
-            <button class="mini" id="missPick" style="flex:1">Указать файлы…</button>
-            <button class="mini" id="missSkip" style="flex:1">Сохранить без них</button>
-          </div>
-          <div class="modes two">
-            <button class="mini" id="projSave" title="*.pcbr — zip без сжатия: project.json (слои, деформация, NET, компоненты, вид) + оригиналы картинок">Сохранить проект</button>
-            <button class="mini" id="projLoad" title="открыть *.pcbr (или старый JSON-экспорт)">Загрузить проект</button>
-            <button class="mini" id="saveNow" title="записать состояние в браузер сейчас (автосохранение и так включено)">Сохранить сейчас</button>
-            <button class="mini" id="resetAll" title="очистить состояние и картинки в браузере и перезагрузить страницу">Сбросить всё</button>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -496,7 +489,8 @@ let compEditShown=false; /* comp panel rendered for edit mode */
 let compVal={R:'',C:''}; /* last typed value per kind — default for new parts */
 let showSide={top:true,bot:true};
 let calib=null;   /* {size,x,y} while calibrating */
-let browseTarget=null, booted=false, imgDir='pcb_overlay_img/', projName='project';
+let browseTarget=null, booted=false, projName='project';
+const imgDir='pcb_overlay_img/';   /* fixed: layer pictures by path live next to index.html in this folder */
 const dirJoin=(d,n)=>{ d=(d||'').trim().replace(/\\/g,'/'); if(d&&!d.endsWith('/'))d+='/'; return d+n; };
 const byId=id=>layers.find(l=>l.id===id);
 const idx=id=>layers.findIndex(l=>l.id===id);
@@ -746,7 +740,8 @@ function fitTransform(src,dst,opt){
 /* ---------- render ---------- */
 /* layer shown by eye/side/view mode (α not counted) — net points follow this */
 /* net point visibility: a via (multi-layer point) shows on both sides whatever the layer filter */
-const ptShown=(pt,lay)=>!!pt.via||layerShown(lay);
+const ptShown=(pt,lay)=>{ if(pt.via||xray) return true;   /* via: both sides; others: their side only */
+  const sd=pt.side||lay.side; return sd==='any'||sd===boardSide; };
 function layerShown(l){
   if(!l.on||!onSide(l)) return false;
   const P=parentOf(l); if(P&&!P.on) return false;
@@ -885,7 +880,7 @@ function drawMarks(){
       marks.appendChild(svg('line',{x1:p.x-13,y1:p.y,x2:p.x-7,y2:p.y,stroke:net.color,'stroke-width':1.4}));
       marks.appendChild(svg('line',{x1:p.x+7,y1:p.y,x2:p.x+13,y2:p.y,stroke:net.color,'stroke-width':1.4}));
     }
-    if(labels) txt(p,net.color,net.name+(pt.via?' ·via':' ·'+lay.id.slice(1)),op);
+    if(labels) txt(p,net.color,net.name,op);
   });
   drawComps();
   if(clickMode==='move') drawLayerBox();
@@ -1238,9 +1233,11 @@ function renderCards(){
       pending=null; renderCards(); sync(); drawMarks(); applyAll(); };
     card.onclick=pick;
     const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.tc; sw.dataset.lid=l.id;
-    const nm=document.createElement('span'); nm.className='lname lname-ro'; nm.textContent=l.name;
-    nm.title='имя меняется во вкладке ФАЙЛЫ';
-    const sl=document.createElement('span'); sl.className='lbl tag'; sl.textContent='метка';
+    const nm=document.createElement('input'); nm.type='text'; nm.className='lname'; nm.value=l.name; nm.spellcheck=false;
+    nm.title='имя слоя'; nm.oninput=()=>{ l.name=nm.value; l.el.alt=nm.value; sync(); save(); };
+    nm.onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape') nm.blur(); };
+    nm.onchange=()=>renderCards();
+    const sl=document.createElement('span'); sl.className='lbl tag'; sl.textContent='сторона';
     const sSel=sideSel(l);
     const up=document.createElement('button'); up.className='ibtn'; up.textContent='▲'; up.title='выше';
     const peers=layers.filter(o=>o.kind!=='video'&&grp(o)===grp(l)&&(parentOf(l)?o.parent===l.parent:!parentOf(o))), pi=peers.indexOf(l);
@@ -1254,7 +1251,11 @@ function renderCards(){
     const eye=document.createElement('button'); eye.className='ibtn'; eye.textContent=l.on?'●':'○';
     eye.title='видимость';
     eye.onclick=()=>{l.on=!l.on;renderCards();applyAll();sync()};
-    head.append(sw,nm,sl,sSel,up,dn,eye);
+    const del=document.createElement('button'); del.className='ibtn'; del.textContent='✕'; del.title='удалить слой';
+    del.disabled=layers.filter(o=>o.kind!=='video').length<=1;
+    del.onclick=()=>{ const np=points.filter(p=>p.layer===l.id).length;
+      if(confirm('Удалить слой «'+l.name+'»'+(np?' и его точки NET ('+np+')':'')+'?')) removeLayer(l); };
+    head.append(sw,nm,sl,sSel,up,dn,eye,del);
 
     const body=document.createElement('div'); body.className='lbody';
     const mkSel=(opts,val,title,dis)=>{ const x=document.createElement('select'); x.className='slim mini-sel';
@@ -1297,6 +1298,13 @@ function renderCards(){
       r3.appendChild(b);
     });
     body.append(r1,r2,r3);
+    if(!l.ok){ /* image missing: the only place to pick a file now */
+      const rm=document.createElement('div'); rm.className='row';
+      const tx=document.createElement('span'); tx.className='bad'; tx.style.flex='1'; tx.style.fontSize='11px';
+      tx.textContent=(l.src||l.stored)?'не загружен: '+baseName(l.src):'картинка не задана';
+      const bf=document.createElement('button'); bf.className='mini'; bf.textContent='Выбрать файл…';
+      bf.title='картинка с диска; оригинал хранится в браузере и в проекте'; bf.onclick=()=>{ browseTarget=l.id; $('fileImg').click(); };
+      rm.append(tx,bf); body.appendChild(rm); }
     card.append(head,body); box.appendChild(card);
   });
   const rs=$('refSel'); rs.innerHTML='';
@@ -1304,44 +1312,11 @@ function renderCards(){
     o.textContent=l.name+(l.id===sel?' (активный)':''); rs.appendChild(o); });
   rs.value=refId||'';
 }
-function refreshFiles(force){ /* image status changed; don't rebuild under a focused path/name field */
+function refreshFiles(force){ /* image status changed; don't rebuild cards under a focused name field */
   if(!booted) return;
-  if(force||!$('fileRows').contains(document.activeElement)) renderFiles();
-  else renderVideo(); }
-function renderFiles(){
-  const box=$('fileRows'); box.innerHTML='';
-  [...layers].reverse().forEach(l=>{ if(l.kind==='video') return;
-    const row=document.createElement('div'); row.className='filerow';
-    const cap=document.createElement('div'); cap.className='cap';
-    const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.tc; sw.dataset.lid=l.id;
-    const t=document.createElement('input'); t.type='text'; t.className='lname'; t.value=l.name;
-    t.spellcheck=false; t.placeholder='имя слоя';
-    t.oninput=e=>{ l.name=e.target.value; l.el.alt=e.target.value; renderCards(); sync(); save(); };
-    const sd=sideSel(l); sd.style.width='auto'; sd.style.flex='none';
-    const del=document.createElement('button'); del.className='ibtn'; del.textContent='✕'; del.title='удалить слой';
-    del.disabled=layers.length<=1;
-    del.onclick=()=>{ const np=points.filter(p=>p.layer===l.id).length;
-      if(confirm('Удалить слой «'+l.name+'»'+(np?' и его точки NET ('+np+')':'')+'?')) removeLayer(l); };
-    cap.append(sw,t,sd,del);
-    const path=document.createElement('input'); path.type='text'; path.className='path'; path.value=l.src;
-    path.spellcheck=false;
-    path.onchange=()=>setPath(l,path.value.trim());
-    path.title = (l.stored ? 'копия в браузере; «Перечитать» возьмёт с диска' : (l.ok?'файл по пути загружен':'файл не задан'))+
-      ' · путь = папка картинок + имя файла';
-    const st=document.createElement('div'); st.className='status';
-    if(!l.ok&&(l.src||l.stored)) st.innerHTML='<span class="bad">не загружен</span>'; else st.hidden=true;
-    const btns=document.createElement('div'); btns.className='modes two';
-    const b1=document.createElement('button'); b1.className='mini'; b1.textContent='Выбрать файл…';
-    b1.title='картинка с диска; оригинал хранится в браузере (IndexedDB)';
-    b1.onclick=()=>{browseTarget=l.id;$('fileImg').click()};
-    const b2=document.createElement('button'); b2.className='mini'; b2.textContent='Перечитать файл';
-    b2.title='загрузить файл по пути заново с диска (после его обновления)';
-    b2.onclick=()=>setPath(l,path.value,true);
-    btns.append(b1,b2);
-    row.append(cap,path,st,btns); box.appendChild(row);
-  });
-  renderVideo();
-}
+  if(force||!$('layerCards').contains(document.activeElement)) renderCards();
+  renderVideo(); }
+function renderFiles(){ renderVideo(); }   /* ФАЙЛЫ tab dissolved; callers kept */
 /* ВИДЕО tab: video layers live here only (not in СЛОИ / ФАЙЛЫ); the block selects the layer as active */
 function renderVideo(){
   const box=$('vidRows'); if(!box) return; box.innerHTML='';
@@ -1540,7 +1515,6 @@ function sync(){
   $('moveBtn').disabled=!!(sel_()&&sel_().H);
   $('gridBtn').classList.toggle('on',grid); vp.classList.toggle('nogrid',!grid);
   $('invBtn').classList.toggle('on',inverted);
-  if(document.activeElement!==$('imgDir')) $('imgDir').value=imgDir;
   $('flipBoard').textContent='Плата: '+(boardSide==='top'?'TOP':'BOT')+' · перевернуть (F)';
   $('xrayBtn').classList.toggle('on',xray);
   { const l=sel_(); ['keyOn','keyCol','keyPick','keyTol'].forEach(i=>$(i).disabled=!l);
@@ -1604,7 +1578,6 @@ function restore(s){
   showNets=s.showNets!==false; showComps=s.showComps!==false;
   showSide=Object.assign({top:true,bot:true},s.showSide||{});
   selComp=null; calib=null; warpModel=s.warpModel==='persp'?'persp':'affine';
-  imgDir=typeof s.imgDir==='string'?s.imgDir:'pcb_overlay_img/';
   if(typeof s.projName==='string'&&s.projName) projName=s.projName;
   /* old saves kept only the bare file name for files picked via dialog */
   layers.forEach(l=>{ if(l.stored && l.src && !/[\/\\]/.test(l.src)) l.src=dirJoin(imgDir,l.src); });
@@ -1628,8 +1601,8 @@ function checkMissing(){
   box.hidden=false;
   box.innerHTML = bad.length
     ? 'Не загружено: '+bad.map(l=>l.name+' — '+(l.src||'нет файла')).join('<br>')+
-      '<br>Вкладка ФАЙЛЫ — укажите путь или выберите файл.'
-    : 'Изображения не заданы. Вкладка ФАЙЛЫ.';
+      '<br>СЛОИ → «Выбрать файл…» в карточке слоя (картинки ищутся в pcb_overlay_img/).'
+    : 'Изображения не заданы. СЛОИ → «+ Добавить слой».';
 }
 function setPath(l,v,reread){ v=(v||'').trim().replace(/\\/g,'/');
   l.src=v; l.stored=false; l.blob=null; localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{}); l.ok=false;
@@ -1948,8 +1921,9 @@ vp.addEventListener('pointerup',e=>{
     if(hit){ selPoint=hit.id; activeNet=hit.net; hlNet=hit.net; renderNets(); }
     else if(activeNet){
       const via=e.altKey; /* Alt+click: via, shown on both sides */
+      const host=mainOf(boardSide)||s;   /* glued to the side's main photo, follows its move / warp */
       points.push({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-        net:activeNet, layer:s.id, p:imgOf(s,m), ...(via?{via:true}:{})});
+        net:activeNet, layer:host.id, side:boardSide, p:imgOf(host,m), ...(via?{via:true}:{})});
       pinFromPoint(m,activeNet,via);
       selPoint=null; renderNets();
     }
@@ -2110,7 +2084,6 @@ $('delPoint').onclick=()=>{points=points.filter(p=>p.id!==selPoint);selPoint=nul
 $('clearNetPts').onclick=()=>{points=points.filter(p=>p.net!==activeNet);selPoint=null;renderNets();drawMarks();sync();save()};
 $('labelsBtn').onclick=()=>{labels=!labels;sync();drawMarks();save()};
 
-$('imgDir').onchange=e=>{ imgDir=e.target.value.trim().replace(/\\/g,'/'); save(); };
 $('addLayer').onclick=()=>{ const l=addLayer(); browseTarget=l.id; $('fileImg').click(); };
 $('fileImg').onchange=e=>{const f=e.target.files[0]; if(f&&browseTarget)storeFile(browseTarget,f); e.target.value='';};
 $('projSave').onclick=()=>saveProject(false);
