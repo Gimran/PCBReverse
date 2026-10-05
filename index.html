@@ -1132,7 +1132,7 @@ function renderCards(){
       sel=l.id; if(refId===sel) refId=(layers.find(x=>x.id!==sel)||l).id;
       pending=null; renderCards(); sync(); drawMarks(); applyAll(); };
     card.onclick=pick;
-    const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.color;
+    const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.tc; sw.dataset.lid=l.id;
     const nm=document.createElement('span'); nm.className='lname lname-ro'; nm.textContent=l.name;
     nm.title='имя меняется во вкладке ФАЙЛЫ';
     const sl=document.createElement('span'); sl.className='lbl tag'; sl.textContent='метка';
@@ -1169,8 +1169,9 @@ function renderCards(){
     r1.append(al,op,opv,bl);
 
     const r2=document.createElement('div'); r2.className='row';
-    const tc=document.createElement('input'); tc.type='color'; tc.value=l.tc; tc.title='цвет тонировки';
-    tc.oninput=()=>{l.tc=tc.value;applyTint(l);save()};
+    const tc=document.createElement('input'); tc.type='color'; tc.value=l.tc; tc.title='цвет слоя (метка) и тонировки';
+    tc.oninput=()=>{l.tc=l.color=tc.value;applyTint(l);save();  /* layer colour = tint colour; repaint swatches in place */
+      document.querySelectorAll(`.swatch[data-lid="${l.id}"]`).forEach(x=>x.style.background=l.tc);};
     const tn=document.createElement('input'); tn.type='range'; tn.min=0; tn.max=100; tn.value=Math.round(l.tn*100);
     const tnv=document.createElement('span'); tnv.className='val'; tnv.textContent=tn.value+'%';
     tn.oninput=()=>{l.tn=tn.value/100;tnv.textContent=tn.value+'%';applyTint(l);save()};
@@ -1206,7 +1207,7 @@ function renderFiles(){
   [...layers].reverse().forEach(l=>{
     const row=document.createElement('div'); row.className='filerow';
     const cap=document.createElement('div'); cap.className='cap';
-    const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.color;
+    const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.tc; sw.dataset.lid=l.id;
     const t=document.createElement('input'); t.type='text'; t.className='lname'; t.value=l.name;
     t.spellcheck=false; t.placeholder='имя слоя';
     t.oninput=e=>{ l.name=e.target.value; l.el.alt=e.target.value; renderCards(); sync(); save(); };
@@ -1389,7 +1390,7 @@ let saveTimer=null, statusHold=0; /* project messages stay visible a few seconds
 function snapshot(){
   return {v:4, count:layers.length, sel, refId, viewMode, swipe, view, boardSide, xray,
     inverted, grid, labels, blinkOn, tintMode,
-    layers:layers.map(l=>({id:l.id,name:l.name,color:l.color,side:l.side,src:l.src,stored:l.stored,
+    layers:layers.map(l=>({id:l.id,name:l.name,color:l.tc,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop})),
     nets, points, activeNet, netSeq,
