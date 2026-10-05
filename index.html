@@ -573,13 +573,14 @@ function fitTransform(src,dst,opt){
 }
 
 /* ---------- render ---------- */
-function effOpacity(l){
-  if(!l.on) return 0;
-  if(!onSide(l)) return 0;
-  if(viewMode==='solo') return l.id===sel? l.op : 0;
-  if(viewMode==='swipe') return (l.id===sel||l.id===refId)? l.op : 0;
-  return l.op;
+/* layer shown by eye/side/view mode (α not counted) — net points follow this */
+function layerShown(l){
+  if(!l.on||!onSide(l)) return false;
+  if(viewMode==='solo') return l.id===sel;
+  if(viewMode==='swipe') return l.id===sel||l.id===refId;
+  return true;
 }
+function effOpacity(l){ return layerShown(l)? l.op : 0; }
 function applyTint(l){
   const a=Math.max(0,Math.min(1,l.tn));
   l.fx.flood.setAttribute('flood-color',l.tc);
@@ -606,7 +607,7 @@ function applyLayer(l){
   if(s && s!==l && s.H && s.pairs.some(pr=>pr.rl===l.id)) recompute(false);
   drawMarks(); save();
 }
-function applyAll(){ layers.forEach(applyLayer); applyClip(); }
+function applyAll(){ layers.forEach(applyLayer); applyClip(); if(booted)drawMarks(); }
 function applyClip(){
   const on=viewMode==='swipe' && byId(sel) && byId(refId);
   vp.classList.toggle('swipe',!!on);
@@ -664,7 +665,7 @@ function drawMarks(){
   if(pending&&byId(refId)) ring(screenOf(worldOf(byId(refId),pending)),byId(refId).color,7,1.6,.9);
   points.forEach(pt=>{
     const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
-    if(!net||!net.on||!lay) return;
+    if(!net||!net.on||!lay||!layerShown(lay)) return;
     const p=screenOf(worldOf(lay,pt.p));
     const hot=hlNet===null||hlNet===net.id, op=hot?1:.28;
     ring(p,net.color,hot&&hlNet!==null?9:6,hot&&hlNet!==null?2.2:1.5,op);
@@ -776,12 +777,33 @@ function hitComp(m){
     }});
   return best;
 }
+/* net point inside a pin's zone (its half of the body, with a margin) sets that pin's net;
+   only points on visible layers, the active layer wins, then the one closest to the pad */
+function autoPins(c){
+  const g=PKG[c.size], k=mmScale||1, hl=g.L/2*k, hw=g.W/2*k, t=g.T*k;
+  const a=-(c.rot||0)*Math.PI/180, co=Math.cos(a), si=Math.sin(a);
+  const best={n1:null,n2:null};
+  points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
+    if(!net||!net.on||!lay||!layerShown(lay))return;
+    const w=worldOf(lay,pt.p), dx=w.x-c.x, dy=w.y-c.y;
+    const u=dx*co-dy*si, v=dx*si+dy*co;
+    if(Math.abs(u)>hl+g.L*k*.15 || Math.abs(v)>hw+g.W*k*.25) return;
+    const key=u<0?'n1':'n2', d=Math.hypot(Math.abs(u)-(hl-t/2),v), pri=lay.id===sel?0:1;
+    const b=best[key]; if(!b||pri<b.pri||(pri===b.pri&&d<b.d)) best[key]={net:net.id,pri,d};
+  });
+  let ch=false;
+  ['n1','n2'].forEach(k2=>{ if(best[k2]&&c[k2]!==best[k2].net){ c[k2]=best[k2].net; ch=true; } });
+  /* after a turn the other pin may still carry the net that just moved over — drop it */
+  [['n1','n2'],['n2','n1']].forEach(([k2,o])=>{
+    if(best[k2]&&!best[o]&&c[o]===best[k2].net){ c[o]=null; ch=true; } });
+  return ch;
+}
 function addComp(m){
   if(!mmScale) return;
   const kind=compKind, des=kind+(compSeq[kind]++);
   const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
     kind, size:compSize, side:compSide, x:m.x, y:m.y, rot:compRot, des, val:'', n1:null, n2:null};
-  comps.push(c); selComp=c.id; renderComps(); drawMarks(); save();
+  autoPins(c); comps.push(c); selComp=c.id; renderComps(); drawMarks(); save();
 }
 function renderComps(){
   const box=$('complist'); box.innerHTML='';
@@ -821,7 +843,7 @@ function renderProps(){
   mkRow('value',val);
   const sz=document.createElement('select'); sz.className='slim';
   Object.keys(PKG).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sz.appendChild(o)});
-  sz.value=c.size; sz.onchange=()=>{c.size=sz.value;renderComps0();drawMarks();save()};
+  sz.value=c.size; sz.onchange=()=>{c.size=sz.value;if(autoPins(c))renderProps();renderComps0();drawMarks();save()};
   mkRow('корпус',sz);
   const sd=document.createElement('select'); sd.className='slim';
   [['top','top-comp'],['bot','bot-comp']].forEach(([v,t])=>{const o=document.createElement('option');
@@ -860,7 +882,7 @@ function rotateComp(d){
   if(clickMode==='calib'&&calib){ calib.rot=(((calib.rot||0)+d)%360+360)%360;
     compRot=calib.rot; drawMarks(); syncComps(); return; }
   const c=comps.find(o=>o.id===selComp);
-  if(c){ c.rot=(((c.rot||0)+d)%360+360)%360; compRot=c.rot; drawMarks(); renderProps(); save(); return; }
+  if(c){ c.rot=(((c.rot||0)+d)%360+360)%360; compRot=c.rot; autoPins(c); drawMarks(); renderProps(); save(); return; }
   compRot=(((compRot+d)%360)+360)%360; syncComps();
 }
 const SLIDER_MIN=2, SLIDER_MAX=400;
@@ -1041,7 +1063,7 @@ function addNet(){
 function hitPoint(m){
   let best=null,bd=12/Math.abs(view.z);
   points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
-    if(!net||!net.on||!lay)return;
+    if(!net||!net.on||!lay||!layerShown(lay))return;
     const w=worldOf(lay,pt.p), d=Math.hypot(w.x-m.x,w.y-m.y);
     if(d<bd){bd=d;best=pt;} });
   return best;
@@ -1279,6 +1301,8 @@ vp.addEventListener('pointerup',e=>{
   if(e.button===1){ drag=null; vp.classList.remove('grabbing'); return; }
   if(e.button!==0)return;
   const d=drag; drag=null; vp.classList.remove('grabbing');
+  if(d&&d.t==='comp'&&d.moved){ const c=comps.find(o=>o.id===d.id);
+    if(c&&autoPins(c)){ renderProps(); drawMarks(); save(); } return; }
   if(!d||d.moved||d.t!=='click')return;
   const m=worldFromEvent(e), s=sel_();
   if(clickMode==='calib'){
@@ -1484,7 +1508,7 @@ addEventListener('keydown',e=>{
       const d=screenDelta(v.x*view.z,v.y*view.z);
       const c=comps.find(o=>o.id===selComp);
       if(clickMode==='move'){ if(s&&!s.H){ s.x+=d.x; s.y+=d.y; applyLayer(s); } }
-      else if(c&&(clickMode==='comp'||clickMode==='none')){ c.x+=d.x; c.y+=d.y; drawMarks(); save(); }
+      else if(c&&(clickMode==='comp'||clickMode==='none')){ c.x+=d.x; c.y+=d.y; if(autoPins(c))renderProps(); drawMarks(); save(); }
       break;}
     case '[':if(s&&!s.H){s.rot=Math.round((s.rot-0.1*st)*10)/10;applyLayer(s)}break;
     case ']':if(s&&!s.H){s.rot=Math.round((s.rot+0.1*st)*10)/10;applyLayer(s)}break;
