@@ -421,6 +421,7 @@ const PKG={ '0201':{L:0.60,W:0.30,T:0.15}, '0402':{L:1.00,W:0.50,T:0.25},
 const SIDECOL={top:'#e8b04b', bot:'#59a7d8'};
 let comps=[], selComp=null, mmScale=0, compSeq={R:1,C:1};
 let compKind='R', compSize='0603', compSide='top', compRot=0;
+let compEditShown=false; /* comp panel rendered for edit mode */
 let compVal={R:'',C:''}; /* last typed value per kind — default for new parts */
 let showSide={top:true,bot:true};
 let calib=null;   /* {size,x,y} while calibrating */
@@ -831,6 +832,7 @@ function renderComps(){
     const v=document.createElement('span'); v.className='v'; v.textContent=c.val||'—';
     const sz=document.createElement('span'); sz.className='s'; sz.textContent=c.size;
     const x=document.createElement('button'); x.className='x'; x.textContent='✕';
+    x.disabled=clickMode!=='comp';
     x.onclick=e=>{e.stopPropagation(); comps=comps.filter(o=>o.id!==c.id);
       if(selComp===c.id)selComp=null; renderComps();drawMarks();save()};
     row.onclick=()=>{selComp=c.id;renderComps();drawMarks();sync()};
@@ -881,6 +883,10 @@ function renderProps(){
   const del=document.createElement('button'); del.className='mini wide'; del.textContent='Удалить компонент';
   del.onclick=()=>{comps=comps.filter(o=>o.id!==c.id);selComp=null;renderComps();drawMarks();save()};
   box.appendChild(del);
+  if(clickMode!=='comp'){ /* view only outside the edit mode */
+    box.querySelectorAll('input,select,button').forEach(n=>n.disabled=true);
+    const h=document.createElement('div'); h.className='empty';
+    h.textContent='Правка — в режиме «Редактирование компонентов» (K).'; box.appendChild(h); }
 }
 function renderComps0(){ /* list refresh without rebuilding props (keeps focus) */
   const box=$('complist');
@@ -895,7 +901,7 @@ function rotateComp(d){
   if(clickMode==='calib'&&calib){ calib.rot=(((calib.rot||0)+d)%360+360)%360;
     compRot=calib.rot; drawMarks(); syncComps(); return; }
   const c=comps.find(o=>o.id===selComp);
-  if(c){ c.rot=(((c.rot||0)+d)%360+360)%360; compRot=c.rot; autoPins(c); drawMarks(); renderProps(); save(); return; }
+  if(c&&clickMode==='comp'){ c.rot=(((c.rot||0)+d)%360+360)%360; compRot=c.rot; autoPins(c); drawMarks(); renderProps(); save(); return; }
   compRot=(((compRot+d)%360)+360)%360; syncComps();
 }
 const SLIDER_MIN=2, SLIDER_MAX=400;
@@ -1136,7 +1142,8 @@ function sync(){
   const netting=clickMode==='net', an=nets.find(n=>n.id===activeNet);
   $('netPickBtn').classList.toggle('on',netting);
   $('netPickBtn').textContent='Редактирование нетов (N)';
-  $('delPoint').disabled=!selPoint; $('clearNetPts').disabled=!an||!points.some(p=>p.net===activeNet);
+  $('delPoint').disabled=!netting||!selPoint; $('clearNetPts').disabled=!netting||!an||!points.some(p=>p.net===activeNet);
+  if(compEditShown!==(clickMode==='comp')){ compEditShown=clickMode==='comp'; renderComps(); }
   $('labelsBtn').classList.toggle('on',labels);
   $('netStatus').innerHTML= !an? 'Создайте нет, затем ставьте его точки на слоях.'
     : `Активный нет: <b>${an.name}</b> · точек ${points.filter(p=>p.net===activeNet).length}<br>`+
@@ -1288,7 +1295,7 @@ vp.addEventListener('pointerdown',e=>{
         vp.setPointerCapture(e.pointerId); return; }
     }
     const hc=hitComp(m);
-    if(hc && (clickMode==='comp'||clickMode==='none')){
+    if(hc && clickMode==='comp'){
       selComp=hc.id; renderComps();
       drag={t:'comp',id:hc.id,x:e.clientX,y:e.clientY,moved:false,ox:hc.x,oy:hc.y};
       vp.setPointerCapture(e.pointerId); return; }
@@ -1523,7 +1530,7 @@ addEventListener('keydown',e=>{
       const d=screenDelta(v.x*view.z,v.y*view.z);
       const c=comps.find(o=>o.id===selComp);
       if(clickMode==='move'){ if(s&&!s.H){ s.x+=d.x; s.y+=d.y; applyLayer(s); } }
-      else if(c&&(clickMode==='comp'||clickMode==='none')){ c.x+=d.x; c.y+=d.y; if(autoPins(c))renderProps(); drawMarks(); save(); }
+      else if(c&&clickMode==='comp'){ c.x+=d.x; c.y+=d.y; if(autoPins(c))renderProps(); drawMarks(); save(); }
       break;}
     case '[':if(s&&!s.H){s.rot=Math.round((s.rot-0.1*st)*10)/10;applyLayer(s)}break;
     case ']':if(s&&!s.H){s.rot=Math.round((s.rot+0.1*st)*10)/10;applyLayer(s)}break;
