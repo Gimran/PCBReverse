@@ -64,6 +64,7 @@ h1{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-weight:
 .clip{position:absolute;inset:0;pointer-events:none}
 .scene{position:absolute;inset:0;transform-origin:50% 50%;pointer-events:none}
 .lbox{position:absolute;left:50%;top:50%;width:1200px;transform-origin:50% 50%;pointer-events:none}
+.lbox video{display:block;width:100%;height:auto;pointer-events:none}
 .lbox img{display:block;width:100%;height:auto;pointer-events:none;
   user-select:none;-webkit-user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
 @keyframes blinkfade{0%,100%{opacity:var(--op,1)}50%{opacity:calc(var(--op,1) * .12)}}
@@ -414,7 +415,10 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 
       <div data-page="data" hidden>
         <div class="sect">
-          <button class="mini wide" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
+          <div class="modes two">
+            <button class="mini" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
+            <button class="mini" id="addVideo" title="экспериментально: изображение с камеры / USB-микроскопа как слой">+ Видеослой</button>
+          </div>
           <div class="status">Слой удаляется кнопкой ✕ в его строке — вместе со своими точками нетов и опорными парами.</div>
           <div class="row"><span class="lbl" style="flex:none">Папка картинок</span>
             <input type="text" class="path" id="imgDir" spellcheck="false"
@@ -511,6 +515,7 @@ function mkLayer(i,init){
   img.draggable=false; img.setAttribute('draggable','false');
   box.appendChild(img); scene.appendChild(box); clip.appendChild(scene);
   l.clip=clip; l.scene=scene; l.box=box; l.el=img;
+  if(l.kind==='video') attachVideo(l);
   img.addEventListener('load',()=>{ l.ok=true;
     if(img.naturalWidth) l.h=1200*img.naturalHeight/img.naturalWidth;
     applyLayer(l); checkMissing(); sync(); refreshFiles(); });
@@ -570,8 +575,48 @@ function addLayer(){ /* new layer on the current board side, top of its group, b
   const l=mkLayer(n-1,{side:boardSide}); l.name='Слой '+n;
   layers.push(l); sel=l.id; layersChanged(); return l;
 }
+/* ---------- video layer (experimental): camera / USB microscope via getUserMedia ----------
+   the <video> sits in the layer box instead of the <img>; geometry, warp, crop, key, correction, tint all apply */
+function attachVideo(l){
+  const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.autoplay=true;
+  l.el.style.display='none'; l.box.appendChild(v); l.vid=v;
+  v.addEventListener('loadedmetadata',()=>{ if(v.videoWidth){ l.h=1200*v.videoHeight/v.videoWidth; }
+    l.ok=true; applyLayer(l); sync(); refreshFiles(); });
+}
+async function startCam(l,quiet){
+  stopCam(l); l.camErr='';
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ l.camErr='браузер не даёт доступ к камере'; refreshFiles(); return; }
+  try{
+    l.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{
+      ...(l.camId?{deviceId:{exact:l.camId}}:{}), width:{ideal:1920}, height:{ideal:1080}}});
+    l.vid.srcObject=l.stream; await l.vid.play().catch(()=>{});
+    const tr=l.stream.getVideoTracks()[0]; if(tr&&!l.camId) l.camId=tr.getSettings().deviceId||'';
+    await listCams(); save();
+  }catch(err){ l.stream=null; l.camErr=quiet?'камера не запущена — «Старт»':(err.name+': '+err.message); }
+  refreshFiles(true);
+}
+function stopCam(l){ if(l.stream){ l.stream.getTracks().forEach(t=>t.stop()); l.stream=null; }
+  if(l.vid) l.vid.srcObject=null; l.ok=false; }
+let camList=[];
+async function listCams(){ try{ camList=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'); }catch(err){} }
+function addVideoLayer(){
+  const l=addLayer(); l.kind='video'; l.name='Видео '+l.id.slice(1); attachVideo(l); startCam(l); return l;
+}
+function snapLayer(l){ /* freeze the current frame into a new image layer at the same place */
+  const v=l.vid; if(!v||!v.videoWidth) return;
+  const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  c.toBlob(b=>{ if(!b) return;
+    const n=addLayer(), keep=['x','y','rot','scale','fh','fv','side','H','crop'];
+    keep.forEach(k=>n[k]=JSON.parse(JSON.stringify(l[k]??null))); n.cor={...l.cor};
+    n.name='Снимок '+new Date().toLocaleTimeString('ru-RU');
+    storeFile(n.id,new File([b],'micro_'+Date.now()+'.png',{type:'image/png'}));
+    layersChanged();
+  },'image/png');
+}
 function removeLayer(l){
   if(layers.length<=1) return;
+  stopCam(l);
   layers=layers.filter(x=>x!==l);
   points=points.filter(p=>p.layer!==l.id);
   layers.forEach(o=>o.pairs=o.pairs.filter(pr=>pr.rl!==l.id));
@@ -688,6 +733,7 @@ function applyTint(l){
                                        : '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1');
   applyCor(l);
   l.el.style.filter = (a>0||l.kOn||corActive(l.cor)) ? `url(#tf_${l.id})` : 'none';
+  if(l.vid) l.vid.style.filter=l.el.style.filter;
 }
 function applyCor(l){
   const c=l.cor, set=(fs,a)=>fs.forEach(x=>{ for(const k in a) x.setAttribute(k,a[k]); });
@@ -713,6 +759,7 @@ function applyLayer(l){
   }
   const cr=l.crop;
   l.el.style.clipPath = cr ? `inset(${cr.y0}px ${l.w-cr.x1}px ${l.h-cr.y1}px ${cr.x0}px)` : 'none';
+  if(l.vid) l.vid.style.clipPath=l.el.style.clipPath;
   const o=effOpacity(l);
   l.box.style.setProperty('--op',o); l.box.style.opacity=o;
   l.box.style.filter=inverted?'invert(1) hue-rotate(180deg)':'none';
@@ -761,13 +808,18 @@ function layerDragAllowed(){ return clickMode==='move'; }
 
 function svg(tag,attrs){const n=document.createElementNS(SVGNS,tag);
   for(const k in attrs) n.setAttribute(k,attrs[k]); return n;}
+/* label halo contrasting with the text colour: dark text gets a light glow */
+function haloFor(col){ const m=/^#?([0-9a-f]{6})$/i.exec(col||''); if(!m) return 'rgba(0,0,0,.78)';
+  const n=parseInt(m[1],16), y=(.299*(n>>16)+.587*(n>>8&255)+.114*(n&255))/255;
+  return y<.4?'rgba(255,255,255,.85)':'rgba(0,0,0,.78)'; }
 function drawMarks(){
   while(marks.firstChild) marks.removeChild(marks.firstChild);
   const ring=(p,col,r,wd,op)=>marks.appendChild(svg('circle',{cx:p.x,cy:p.y,r:r,fill:'none',
     stroke:col,'stroke-width':wd,opacity:op}));
   const dot=(p,col,op)=>marks.appendChild(svg('circle',{cx:p.x,cy:p.y,r:1.6,fill:col,opacity:op}));
-  const txt=(p,col,t,op)=>{const n=svg('text',{x:p.x+9,y:p.y-7,fill:col,'font-size':11,
-    'font-family':'IBM Plex Mono, monospace',opacity:op}); n.textContent=t; marks.appendChild(n);};
+  const txt=(p,col,t,op)=>{const n=svg('text',{x:p.x+10,y:p.y-8,fill:col,'font-size':13,'font-weight':500,
+    'font-family':'IBM Plex Mono, monospace',opacity:op,stroke:haloFor(col),'stroke-width':4,
+    'stroke-linejoin':'round','paint-order':'stroke'}); n.textContent=t; marks.appendChild(n);};  /* halo keeps labels readable */
   /* warp pairs: thin black '+' — must not look like net points */
   const cross=(p,r,op)=>marks.appendChild(svg('path',{d:`M${p.x-r} ${p.y}H${p.x+r}M${p.x} ${p.y-r}V${p.y+r}`,
     stroke:'#000','stroke-width':1,fill:'none',opacity:op}));
@@ -1200,8 +1252,8 @@ function renderCards(){
     o.textContent=l.name+(l.id===sel?' (активный)':''); rs.appendChild(o); });
   rs.value=refId||'';
 }
-function refreshFiles(){ /* image status changed; don't rebuild under a focused path field */
-  if(booted&&!$('fileRows').contains(document.activeElement)) renderFiles(); }
+function refreshFiles(force){ /* image status changed; don't rebuild under a focused path field */
+  if(booted&&(force||!$('fileRows').contains(document.activeElement))) renderFiles(); }
 function renderFiles(){
   const box=$('fileRows'); box.innerHTML='';
   [...layers].reverse().forEach(l=>{
@@ -1221,6 +1273,25 @@ function renderFiles(){
     del.onclick=()=>{ const np=points.filter(p=>p.layer===l.id).length;
       if(confirm('Удалить слой «'+l.name+'»'+(np?' и его точки нетов ('+np+')':'')+'?')) removeLayer(l); };
     cap.append(sw,t,sd,del);
+    if(l.kind==='video'){
+      const cs=document.createElement('select'); cs.className='slim'; cs.title='камера';
+      const opts=camList.length?camList:[{deviceId:l.camId||'',label:'камера'}];
+      opts.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||('камера '+(i+1)); cs.appendChild(o); });
+      cs.value=l.camId||''; cs.onchange=()=>{ l.camId=cs.value; startCam(l); };
+      const st=document.createElement('div'); st.className='status';
+      const v=l.vid, live=!!l.stream;
+      st.innerHTML = live ? `<span class="good">видео идёт</span> · ${v.videoWidth}×${v.videoHeight}`
+        : '<span class="bad">'+(l.camErr||'камера остановлена')+'</span>';
+      const btns=document.createElement('div'); btns.className='modes three';
+      const b1=document.createElement('button'); b1.className='mini'; b1.textContent=live?'Стоп':'Старт';
+      b1.onclick=()=>{ if(l.stream){ stopCam(l); renderFiles(); } else startCam(l); };
+      const b2=document.createElement('button'); b2.className='mini'; b2.textContent='Снимок в слой';
+      b2.title='текущий кадр — новым слоем-картинкой на том же месте'; b2.disabled=!live; b2.onclick=()=>snapLayer(l);
+      const b3=document.createElement('button'); b3.className='mini'; b3.textContent='обновить список';
+      b3.onclick=async()=>{ await listCams(); renderFiles(); };
+      btns.append(b1,b2,b3);
+      row.append(cap,cs,st,btns); box.appendChild(row); return;
+    }
     const path=document.createElement('input'); path.type='text'; path.className='path'; path.value=l.src;
     path.spellcheck=false;
     path.onchange=()=>setPath(l,path.value.trim());
@@ -1392,7 +1463,7 @@ function snapshot(){
     inverted, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.tc,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
-      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop})),
+      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId})),
     nets, points, activeNet, netSeq,
     comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
 }
@@ -1403,7 +1474,7 @@ function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
 }
 function restore(s){
   if(!s||!Array.isArray(s.layers))return false;
-  layers.forEach(l=>{l.clip.remove();l.fx.node.remove()}); layers=[];
+  layers.forEach(l=>{stopCam(l);l.clip.remove();l.fx.node.remove()}); layers=[];
   s.layers.forEach((d,i)=>{ const l=mkLayer(i,{
     id:d.id, name:d.name||'Слой '+(i+1), color:d.color||LAYPAL[i%LAYPAL.length],
     side:d.side||'any',
@@ -1412,7 +1483,8 @@ function restore(s){
     tc:d.tc||LAYPAL[i%LAYPAL.length], tn:typeof d.tn==='number'?d.tn:0,
     tm:d.tm||s.tintMode||'color',
     blend:d.blend||'normal', pairs:Array.isArray(d.pairs)?d.pairs:[],
-    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{}), crop:d.crop||null});
+    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{}), crop:d.crop||null,
+    ...(d.kind==='video'?{kind:'video',camId:d.camId||''}:{})});
     layers.push(l); });
   restack();
   sel=byId(s.sel)?s.sel:layers[layers.length-1].id;
@@ -1441,6 +1513,7 @@ function restore(s){
 function setBlobSrc(l,b){ if(l.url) URL.revokeObjectURL(l.url); l.url=URL.createObjectURL(b); l.el.src=l.url; }
 function loadImages(){
   layers.forEach(l=>{ l.ok=false; l.blob=null;
+    if(l.kind==='video'){ startCam(l,true); return; }
     const fromPath=()=>{ const d=l.stored? localStorage.getItem(IMGKEY(l.id)) : null;
       if(d) l.el.src=d; else if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); };
     if(!l.stored){ fromPath(); return; }
@@ -1630,6 +1703,7 @@ async function loadProject(f){
       const data=d.file&&ent[d.file];
       if(data){ const b=new Blob([data],{type:MIME[extOf(d.file)]||''});
         l.blob=b; l.stored=true; setBlobSrc(l,b); idb.put(l.id,b).catch(()=>{}); n++; }
+      else if(l.kind==='video') startCam(l,true);
       else { l.stored=false; if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); }
     }
     afterLoad('Проект загружен: '+f.name+' · картинок '+n);
@@ -1930,6 +2004,7 @@ $('labelsBtn').onclick=()=>{labels=!labels;sync();drawMarks();save()};
 
 $('imgDir').onchange=e=>{ imgDir=e.target.value.trim().replace(/\\/g,'/'); save(); };
 $('addLayer').onclick=()=>{ const l=addLayer(); browseTarget=l.id; $('fileImg').click(); };
+$('addVideo').onclick=()=>addVideoLayer();
 $('fileImg').onchange=e=>{const f=e.target.files[0]; if(f&&browseTarget)storeFile(browseTarget,f); e.target.value='';};
 $('projSave').onclick=()=>saveProject(false);
 $('projLoad').onclick=()=>$('fileProj').click();
