@@ -138,6 +138,10 @@ button.wide{width:100%}
 .lsep{display:flex;align-items:center;gap:8px;font-family:"IBM Plex Mono",monospace;font-size:10px;
   letter-spacing:.08em;color:var(--muted);margin:2px 0 -2px}
 .lsep::before,.lsep::after{content:"";flex:1;border-top:1px solid var(--line)}
+.lsep.gop::before{flex:0 0 10px}.lsep.gop::after{display:none}
+.lsep .gline{flex:1;border-top:1px solid var(--line)}
+.lsep input[type=range]{flex:0 0 110px;width:110px;margin:0}
+.lsep .gv{flex:0 0 32px;text-align:right;letter-spacing:0}
 .lhead{display:flex;align-items:center;gap:5px;padding:5px 6px 4px;cursor:pointer}
 .layer{cursor:pointer}
 .lhead .lname{flex:1;min-width:0;padding:2px 3px;font-size:13px}
@@ -644,6 +648,7 @@ let icPat='d2', icPins=8;   /* IC / connector placement: pattern and pin count *
 let compEditShown=false; /* comp panel rendered for edit mode */
 let compVal={R:'',C:''}; /* last typed value per kind — default for new parts */
 let showSide={top:true,bot:true};
+let sideOp={top:1,bot:1};   /* group opacity of the TOP / BOT layers, multiplies each layer's α */
 let calib=null;   /* {size,x,y} while calibrating */
 let browseTarget=null, booted=false, projName='project';
 const imgDir='pcb_overlay_img/';   /* fixed: layer pictures by path live next to index.html in this folder */
@@ -908,7 +913,9 @@ function layerShown(l){
   if(viewMode==='swipe') return l.id===sel||l.id===refId;
   return true;
 }
-function effOpacity(l){ return layerShown(l)? l.op : 0; }
+function effOpacity(l){ return layerShown(l)? l.op*(sideOp[l.side]??1) : 0; }
+function applySideOp(sd){ layers.forEach(l=>{ if(l.side!==sd) return;   /* opacity only: cheap while the slider moves */
+  const o=effOpacity(l); l.box.style.setProperty('--op',o); l.box.style.opacity=o; }); save(); }
 function applyTint(l){
   const a=Math.max(0,Math.min(1,l.tn));
   l.fx.flood.setAttribute('flood-color',l.tc);
@@ -1701,7 +1708,17 @@ function renderCards(){
   [...layers].reverse().forEach(l=>{ if(l.kind==='video') return;   /* video layer lives in the ВИДЕО tab */
     const i=idx(l.id);
     if(grp(l)!==lastG){ lastG=grp(l); const sp=document.createElement('div'); sp.className='lsep';
-      sp.textContent=[L('обе','both'),'BOT','TOP'][lastG]; box.appendChild(sp); }
+      const nm=document.createElement('span'); nm.textContent=[L('обе','both'),'BOT','TOP'][lastG]; sp.appendChild(nm);
+      if(l.side==='top'||l.side==='bot'){ const sd=l.side; sp.classList.add('gop');
+        const ln=document.createElement('span'); ln.className='gline';
+        const r=document.createElement('input'); r.type='range'; r.min=0; r.max=100; r.value=Math.round(sideOp[sd]*100);
+        r.title=L('прозрачность всех слоёв стороны (умножается на α слоя); двойной клик — 100%',
+                  'opacity of all layers of the side (multiplies the layer α); double-click — 100%');
+        const v=document.createElement('span'); v.className='gv'; v.textContent=r.value+'%';
+        r.oninput=()=>{ sideOp[sd]=r.value/100; v.textContent=r.value+'%'; applySideOp(sd); };
+        r.ondblclick=()=>{ r.value=100; r.oninput(); };
+        sp.append(ln,r,v); }
+      box.appendChild(sp); }
     const card=document.createElement('div');
     card.className='layer'+(parentOf(l)?' sub':'')+(l.id===sel?' sel':'')+
       ((l.on && onSide(l))?'':' off');
@@ -1998,7 +2015,7 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, icPin0, compVal, sideCol:SIDECOL, showSide, showNets, showComps, notes, showDraw, drawStyle, warpModel, imgDir, projName};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, icPin0, compVal, sideCol:SIDECOL, sideOp, showSide, showNets, showComps, notes, showDraw, drawStyle, warpModel, imgDir, projName};
 }
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
@@ -2035,6 +2052,7 @@ function restore(s){
   compSide=s.compSide||'top'; compRot=+s.compRot||0;
   compVal=Object.assign({R:'',C:''},s.compVal||{});
   SIDECOL=Object.assign({...SIDECOL_DEF},s.sideCol||{});
+  sideOp=Object.assign({top:1,bot:1},s.sideOp||{});
   showNets=s.showNets!==false; showComps=s.showComps!==false;
   notes=Array.isArray(s.notes)?s.notes:[]; showDraw=s.showDraw!==false; selNote=null;
   drawStyle=Object.assign({col:'#ffd400',w:2,fs:16},s.drawStyle||{});
