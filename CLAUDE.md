@@ -18,6 +18,7 @@ SMD-компонентов. Выросло из проекта GN1144 (SFP+ 10G)
 | `index.html` | всё приложение: HTML + CSS + JS в одном файле |
 | `pcb_overlay_img/` | картинки слоёв (фото сторон, PNG из герберов, слои компонентов) |
 | `tests/test_project.pcbr` | **эталонный проект для тестов и работы** (в репозитории как пример) |
+| `tests/test_project.pcbr.js` | демо-проект для первого запуска = test_project.pcbr в base64; генерируется `node tests/make_demo.js` |
 | `pcb_overlay_state.json` | старое рабочее состояние (JSON, не в git) |
 | `backups/` | предыдущие версии страницы |
 | `tests/smoke.js` | Playwright-смоук: `node tests/smoke.js [project.pcbr]` (по умолчанию `tests/test_project.pcbr`) |
@@ -190,7 +191,11 @@ SMD-компонентов. Выросло из проекта GN1144 (SFP+ 10G)
   сохранениям (голые имена файлов → дополняются `pcb_overlay_img/`).
 - «Новый проект» (ВИД → Состояние; заменил «Сбросить всё»): confirm со счётчиками слоёв/NET/компонентов → стирает KEY,
   картинки (localStorage + IndexedDB), флаг sessionStorage `pcb-overlay-new`, перезагрузка; boot с флагом создаёт пустые
-  слои TOP main / BOT main (BOT fh, α 50%) и сразу сохраняет. Без флага и без сохранения — демо Сторона A/B.
+  слои TOP main / BOT main (BOT fh, α 50%) и сразу сохраняет.
+- Первый запуск (нет сохранения и нет флага «Новый проект»): те же пустые TOP/BOT, затем `loadDemo()` подключает
+  `<script src="tests/test_project.pcbr.js">` (тот же .pcbr в base64 в `window.PCBR_DEMO` — с file:// fetch запрещён,
+  а script можно) и открывает его обычным `loadProject` как `demo.pcbr`. Параметр `?nodemo` — без демо (смоук, съёмка).
+  **После правки `tests/test_project.pcbr` — `node tests/make_demo.js`** (пересобрать .js).
 - **Проект *.pcbr** (ВИД → Состояние → «Сохранить проект» / «Загрузить проект»): zip без сжатия (store, свой `zipStore`/`unzip`,
   чтение понимает и deflate). Внутри `project.json` = `snapshot()` + у слоя поле `file` → `images/<id>_<имя>.<ext>`
   (оригинальные байты). Сохранение: `showSaveFilePicker`, иначе скачивание; имя = `projName` (из имени загруженного файла).

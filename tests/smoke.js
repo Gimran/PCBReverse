@@ -17,8 +17,12 @@ const PCBR = /\.pcbr$/i.test(STATE);
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   let fail = 0; const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) fail++; };
 
-  await p.goto(URL); await p.waitForTimeout(600);
+  // 0. first start (empty profile): the demo project from the repo opens by itself
+  await p.goto(URL);
+  ok(await p.waitForFunction(() => layers.length > 2 && layers.every(l => l.ok || !(l.src || l.stored)) &&
+      /демо|Demo/.test($('saveStatus').textContent), null, { timeout: 20000 }).then(() => true, () => false), 'demo project opens on first start');
   await p.evaluate(() => localStorage.clear());
+  await p.goto(URL + '?nodemo'); await p.waitForTimeout(600);
   if (PCBR) {
     await p.setInputFiles('#fileProj', STATE); await p.waitForTimeout(2000);
     ok(await p.evaluate(() => /Проект загружен|Project loaded/.test($('saveStatus').textContent)), 'project loads: ' + path.basename(STATE));

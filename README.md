@@ -37,14 +37,15 @@ The UI is in English and Russian; the **EN / RU** switch is at the right end of 
 ## Quick start
 
 1. Download or clone the repository.
-2. Open `index.html` in Chrome or Edge (double-click — works from `file://`).
-3. Right tab **LAYERS → “+ Add layer”** and pick an image; repeat for the other layers.
+2. Open `index.html` in Chrome or Edge (double-click — works from `file://`). The demo project opens.
+3. **VIEW → “New project”**, then in the **LAYERS** cards — “Choose file…” for TOP / BOT; more layers — “+ Add layer”.
 4. Align the layers: left tab **LAYER → “Free transform (M)”** or **WARP** — reference points.
 5. Mark up: **NETS → “Edit NETs” (N)**, **PARTS → calibrate → “Edit components” (K)**.
 6. Save: left tab **VIEW → “Save project”**.
 
-Example — `tests/test_project.pcbr`: a QSFP/SFP module, both sides, Gerbers, NETs, components.
-Open it with **VIEW → “Open project”**.
+On first start (nothing saved in the browser yet) the demo project opens by itself — `tests/test_project.pcbr`:
+a QSFP/SFP module, both sides, Gerbers, NETs, components. Start your own with **VIEW → “New project”**;
+the demo can be opened again with **VIEW → “Open project”**.
 
 Images given by path (older projects) are looked up in the `pcb_overlay_img/` folder next to `index.html`.
 Files chosen in the file dialog are kept in the browser (IndexedDB) and go into the `.pcbr`.

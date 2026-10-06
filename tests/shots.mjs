@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const OUT = process.argv[2];
-const URL = 'http://127.0.0.1:8765/index.html';
+const URL = 'http://127.0.0.1:8765/index.html?nodemo';
 const W = 1680, H = 1000, PORT = 9333;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
