@@ -1268,7 +1268,7 @@ function drawIC(c,col,isSel){
     else{ const cn=[[1,1],[1,-1],[-1,-1],[-1,1]].map(([a,e])=>(q.x+u.x*pw/2*a+nv.x*pl/2*e)+','+(q.y+u.y*pw/2*a+nv.y*pl/2*e));
       pe=svg('polygon',{points:cn.join(' '),fill:f1,stroke:st,'stroke-width':sw}); }
     if(hot) pe.setAttribute('data-hot',''); marks.appendChild(pe);
-    if(nc&&nc.name){ const fs=Math.min(10,pitch*.7,room/(nc.name.length*.62));
+    if(nc&&nc.name){ const fs=conn?(c.fs||12):Math.min(10,pitch*.7,room/(nc.name.length*.62));   /* connector: free space beside the row, font from PROP */
       if(fs>=4.5) dirText({x:q.x+nv.x*(half+3),y:q.y+nv.y*(half+3)},nv,nc.name,fs,nc.color,haloFor(nc.color),hot); }
     if(pitch>13||isSel){ const o=half+7;
       const t=svg('text',{x:q.x-nv.x*o,y:q.y-nv.y*o,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
@@ -1664,7 +1664,11 @@ function renderPropsComp(){
       mkRow(L('пады','pads'),opt([['round',L('круглые','round')],['rect',L('прямоугольные','rectangular')]],c.ps||'round',v=>c.ps=v));
       const ls=opt([['r',L('справа','right')],['l',L('слева','left')]],c.ls||'r',v=>c.ls=v);
       ls.title=L('сторона подписей NET от ряда; у горизонтального ряда «справа» = снизу','NET label side of the row; for a horizontal row “right” = below');
-      mkRow(L('подписи','labels'),ls); }
+      mkRow(L('подписи','labels'),ls);
+      const fz=document.createElement('input'); fz.type='text'; fz.className='num'; fz.value=c.fs||12;
+      fz.title=L('размер шрифта подписей NET, px экрана','NET label font size, screen px');
+      fz.onchange=()=>{ const v=parseFloat(fz.value); c.fs=Number.isFinite(v)?Math.max(5,Math.min(40,v)):12; fz.value=c.fs; drawMarks(); save(); };
+      mkRow(L('шрифт','font'),fz); }
     const sd=document.createElement('select'); sd.className='slim';
     [['top','top-comp'],['bot','bot-comp']].forEach(([v,t])=>{const o=document.createElement('option'); o.value=v;o.textContent=t;sd.appendChild(o)});
     sd.value=c.side; sd.onchange=()=>{c.side=sd.value;renderComps();drawMarks();save()}; mkRow(L('сторона','side'),sd);
