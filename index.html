@@ -139,6 +139,7 @@ button.wide{width:100%}
   letter-spacing:.08em;color:var(--muted);margin:2px 0 -2px}
 .lsep::before,.lsep::after{content:"";flex:1;border-top:1px solid var(--line)}
 .lsep.gop::before{flex:0 0 10px}.lsep.gop::after{display:none}
+.net.merge{outline:1px dashed var(--text);outline-offset:-1px}
 .lsep .gline{flex:1;border-top:1px solid var(--line)}
 .lsep input[type=range]{flex:0 0 110px;width:110px;margin:0}
 .lsep .gv{flex:0 0 32px;text-align:right;letter-spacing:0}
@@ -369,6 +370,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>P</b> — опорные точки · <b>N</b> — редактирование NET · <b>K</b> — редактирование компонентов · <b>D</b> — рисование<br>
             <b>Alt+клик</b> в режиме N — переходное отверстие (точка на обеих сторонах)<br>
             <b>Ctrl+клик</b> в режиме N — новый NET с первой точкой-via (сквозной), сразу ввод имени<br>
+            <b>Alt+A</b> — выделенный NET объединить с другим: клик по его точке или строке в списке (Esc — отмена)<br>
             <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> / <b>Delete</b> — удалить (только в режимах N / K) · <b>Esc</b> — выход
           </div>
           <div class="keys" data-only="en">
@@ -381,6 +383,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>P</b> — reference points · <b>N</b> — edit NETs · <b>K</b> — edit components · <b>D</b> — drawing<br>
             <b>Alt+click</b> in N mode — via (point on both sides)<br>
             <b>Ctrl+click</b> in N mode — new NET whose first point is a via, then type its name<br>
+            <b>Alt+A</b> — merge the highlighted NET into another: click its point or its row in the list (Esc — cancel)<br>
             <b>Space</b> / <b>Shift+Space</b> — rotate component 45°<br><b>right-click</b> / <b>Delete</b> — delete (N / K modes only) · <b>Esc</b> — exit mode
           </div>
         </div>
@@ -1068,6 +1071,7 @@ function drawMarks(){
     if(far) marks.lastChild.setAttribute('stroke-dasharray','3 2');   /* far-side point: dashed ring */
     dot(p,net.color,op);
     if(pt.id===selPoint) ring(p,cssVar('--text')||'#fff',12,1,.9);
+    if(pt.net===mergeFrom){ ring(p,cssVar('--text')||'#fff',14,1.4,.95); marks.lastChild.setAttribute('stroke-dasharray','3 3'); }
     if(hlNet!==null&&hlNet===net.id){
       marks.appendChild(svg('line',{x1:p.x-13,y1:p.y,x2:p.x-7,y2:p.y,stroke:net.color,'stroke-width':1.4}));
       marks.appendChild(svg('line',{x1:p.x+7,y1:p.y,x2:p.x+13,y2:p.y,stroke:net.color,'stroke-width':1.4}));
@@ -1972,7 +1976,9 @@ function renderNets(){
       points=points.filter(p=>p.net!==n.id); nets=nets.filter(x=>x.id!==n.id);
       if(activeNet===n.id)activeNet=nets.length?nets[0].id:null;
       if(hlNet===n.id)hlNet=null; renderNets();drawMarks();sync();save()};
-    row.onclick=()=>{ activeNet=n.id; hlNet=(hlNet===n.id?null:n.id); renderNets(); drawMarks(); sync(); };
+    row.onclick=()=>{ if(mergeFrom){ if(n.id!==mergeFrom) mergeNets(mergeFrom,n.id); return; }
+      activeNet=n.id; hlNet=(hlNet===n.id?null:n.id); renderNets(); drawMarks(); sync(); };
+    if(n.id===mergeFrom) row.classList.add('merge');
     row.append(grip,col,nm,cnt,eye,del); box.appendChild(row);
   });
 }
@@ -1986,6 +1992,24 @@ function focusNetName(id){ /* type the name right away */
   if(document.querySelector('[data-page="nets"]').hidden) document.querySelector('[data-tab="nets"]').click();
   const i=$('netlist').querySelector(`input[data-net="${id}"]`);
   if(i){ i.scrollIntoView({block:'nearest'}); i.focus(); i.select(); }
+}
+/* Alt+A: assign the highlighted NET to the next clicked one (point on the board or row in the list) */
+let mergeFrom=null;
+function startMerge(){
+  const sp=selPoint&&points.find(p=>p.id===selPoint), id=hlNet||(sp&&sp.net)||null;
+  if(!id||!nets.some(n=>n.id===id)) return;
+  mergeFrom=id; hlNet=null; showNets=true;   /* unmask the other NETs so one can be picked */
+  renderNets(); drawMarks(); sync();
+}
+function mergeNets(from,to){
+  const a=nets.find(n=>n.id===from), b=nets.find(n=>n.id===to); mergeFrom=null;
+  if(a&&b&&a!==b){
+    points.forEach(p=>{ if(p.net===from) p.net=to; });
+    comps.forEach(c=>{ if(c.n1===from) c.n1=to; if(c.n2===from) c.n2=to;
+      (c.pads||[]).forEach(pd=>{ if(pd.net===from) pd.net=to; }); });
+    nets=nets.filter(n=>n!==a); b.on=true;
+    activeNet=hlNet=to; save(); }
+  renderNets(); renderProps(); drawMarks(); sync();
 }
 function hitPoint(m){
   let best=null,bd=12/Math.abs(view.z);
@@ -2078,7 +2102,10 @@ function sync(){
       (hlNet?`<br><span class="good">${L('подсвечен','highlighted')}: ${nets.find(n=>n.id===hlNet).name}</span>`:'');
 
   const cue=$('hudCue');
-  if(picking){cue.hidden=false;cue.textContent=L(`точка ${np+1}: клик по «${nextName}»`,`point ${np+1}: click “${nextName}”`);}
+  const mf=mergeFrom&&nets.find(n=>n.id===mergeFrom);
+  if(mf){cue.hidden=false;cue.textContent=L(`«${mf.name}» → клик по точке другого NET (или по NET в списке) — объединить в него · Esc / клик мимо — отмена`,
+    `“${mf.name}” → click a point of another NET (or a NET in the list) — merge into it · Esc / click empty — cancel`);}
+  else if(picking){cue.hidden=false;cue.textContent=L(`точка ${np+1}: клик по «${nextName}»`,`point ${np+1}: click “${nextName}”`);}
   else if(netting&&an){cue.hidden=false;cue.textContent=an.name+L(': клик — точка · Alt+клик — переходное · Ctrl+клик — новый NET (via)',': click — point · Alt+click — via · Ctrl+click — new NET (via)');}
   else if(clickMode==='move'){cue.hidden=false;cue.textContent=L(`деформация: ${xfMode==='scale'?'масштаб (углы — пропорц., стороны — по оси)':'вращение'} · клик по слою — сменить · ⊕ — центр (двойной клик — в центр) · Shift — шаг 15°`,
     `transform: ${xfMode==='scale'?'scale (corners — proportional, sides — one axis)':'rotate'} · click the layer — switch · ⊕ — pivot (double-click — back to centre) · Shift — 15° steps`);}
@@ -2392,6 +2419,7 @@ vp.addEventListener('pointerdown',e=>{
     drag={t:'pan',x:e.clientX,y:e.clientY,moved:false,ox:view.x,oy:view.y};
     vp.classList.add('grabbing'); vp.setPointerCapture(e.pointerId); return; }
   if(e.button!==0)return;
+  if(mergeFrom){ drag={t:'click',x:e.clientX,y:e.clientY,moved:false}; vp.setPointerCapture(e.pointerId); return; }
   if(e.target===handle){drag={t:'swipe'};vp.setPointerCapture(e.pointerId);return;}
   if(clickMode==='draw'){
     const m=worldFromEvent(e), h=hitNote(e);
@@ -2540,6 +2568,10 @@ vp.addEventListener('pointerup',e=>{
     renderProp(); drawMarks(); return; }
   if(!d||d.moved||d.t!=='click')return;
   const m=worldFromEvent(e), s=sel_();
+  if(mergeFrom){ const hit=hitPoint(m);
+    if(hit&&hit.net!==mergeFrom) mergeNets(mergeFrom,hit.net);
+    else if(!hit){ hlNet=mergeFrom; mergeFrom=null; renderNets(); drawMarks(); sync(); }   /* empty spot: cancel */
+    return; }
   if(clickMode==='calib'){
     if(!calib){ calib={size:$('calSize').value,x:m.x,y:m.y,rot:compRot};
       if(!mmScale) mmScale=sliderToScale(+$('calRange').value); }
@@ -2831,6 +2863,7 @@ $('newProj').onclick=()=>{
 addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
   const st=e.shiftKey?10:1, s=sel_(); let h=true;
+  if(e.altKey&&e.code==='KeyA'){ e.preventDefault(); startMerge(); return; }   /* Alt+A: assign NET */
   if(/^[1-8]$/.test(e.key)){ const l=layers[parseInt(e.key,10)-1];
     if(l){l.on=!l.on;renderCards();applyAll();sync()} e.preventDefault(); return; }
   switch(e.key){
@@ -2853,7 +2886,8 @@ addEventListener('keydown',e=>{
     case 'm':case 'M':case 'ь':case 'Ь':if(!$('moveBtn').disabled)$('moveBtn').click();return;
     case 'f':case 'F':case 'а':case 'А':flipBoard();return;
     case ' ':case 'Spacebar':e.preventDefault();rotateComp(e.shiftKey?-45:45);return;
-    case 'Escape': if(placing){ placing=false; syncComps(); drawMarks(); return; }   /* first Esc ends placing, stays in K */
+    case 'Escape': if(mergeFrom){ hlNet=mergeFrom; mergeFrom=null; renderNets(); drawMarks(); sync(); return; }
+      if(placing){ placing=false; syncComps(); drawMarks(); return; }   /* first Esc ends placing, stays in K */
       clickMode='none';pending=null;calib=null;hlNet=null;renderNets();sync();drawMarks();return;
     case 'z':case 'Z':case 'я':case 'Я':if(!$('undoPt').disabled)$('undoPt').click();return;
     case 'ArrowLeft':case 'ArrowRight':case 'ArrowUp':case 'ArrowDown':{
