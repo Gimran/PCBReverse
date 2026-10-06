@@ -1064,11 +1064,13 @@ function drawMarks(){
       marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:haloFor(fNet.color),'stroke-width':3.5,opacity:.45}));
       marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:fNet.color,'stroke-width':1.5,opacity:.9})); });
   }
+  const cov=showNets&&clickMode!=='net'?padCover():[];
   if(showNets) points.forEach(pt=>{
     const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
     if(!net||!net.on||!lay) return;
     const far=!ptShown(pt,lay); if(far&&net!==fNet) return;   /* the focused NET shows on the far side too */
-    const p=screenOf(worldOf(lay,pt.p)), n0=marks.children.length;
+    const pw=worldOf(lay,pt.p), p=screenOf(pw), n0=marks.children.length;
+    if(pt.id!==selPoint&&cov.some(o=>o.net===net.id&&o.has(pw,p))) return;   /* the pad already shows this NET */
     const hot=hlNet===null||hlNet===net.id, op=hot?1:.28;
     if(pt.via) ring(p,net.color,hot&&hlNet!==null?6.5:5,hot&&hlNet!==null?4:3.2,op); /* via: thick annular pad */
     else ring(p,net.color,hot&&hlNet!==null?9:6,hot&&hlNet!==null?2.2:1.5,op);
@@ -1239,7 +1241,8 @@ function dirText(q,nv,str,fs,fill,halo,hot){
     'font-family':'IBM Plex Mono, monospace',transform:`rotate(${ang.toFixed(2)} ${q.x} ${q.y})`});
   t.textContent=str; if(hot) t.setAttribute('data-hot',''); marks.appendChild(t);
 }
-function drawIC(c,col,isSel){
+/* IC pad geometry on screen: pad centres, row axis U / label normal N per pad, pitch, pad sizes */
+function icGeom(c){
   const b=icBox(c), P=c.pads.map(q=>screenOf(q)), n=P.length, conn=c.pat==='l1';
   const C=P.reduce((a,q)=>({x:a.x+q.x/n,y:a.y+q.y/n}),{x:0,y:0});
   const nrm=v=>{ const d=Math.hypot(v.x,v.y); return d>1e-6?{x:v.x/d,y:v.y/d}:null; };
@@ -1261,6 +1264,10 @@ function drawIC(c,col,isSel){
   const pw=conn?pitch*.7:Math.max(4,pitch*.55);
   const pl=conn?pitch*1.1:Math.max(6,Math.min(pitch*1.5,(Number.isFinite(depth)?depth:pitch*6)*.28));
   const rr=Math.max(5,Math.min(22,pitch*.42)), half=round?rr:pl/2;
+  return {b,P,n,conn,C,U,N,pitch,depth,round,pw,pl,rr,half,dot,sub};
+}
+function drawIC(c,col,isSel){
+  const {b,P,n,conn,C,U,N,pitch,depth,round,pw,pl,rr,half,dot,sub}=icGeom(c);
   if(!conn&&Number.isFinite(depth)&&U[0]){   /* body: inner edges of the pad rows */
     const u0=U[0], v0=N[0], S=P.map(q=>dot(sub(q,C),u0)), T=P.map(q=>dot(sub(q,C),v0));
     const s0=Math.min(...S), s1=Math.max(...S), t0=Math.min(...T)+pl/2, t1=Math.max(...T)-pl/2;
@@ -1293,6 +1300,27 @@ function drawIC(c,col,isSel){
   if(c.val){ const v=svg('text',{x:b.p.x,y:b.p.y+b.h/2+9,fill:isSel?'#fff':col,'font-size':10,'text-anchor':'middle',
     'font-family':'IBM Plex Mono, monospace',stroke:'rgba(0,0,0,.7)','stroke-width':3,'paint-order':'stroke'});
     v.textContent=c.val; marks.appendChild(v); }
+}
+/* pads of visible parts that carry a NET: [{net, has(w,q)}] (w world, q screen) — a NET point inside such a pad
+   of the same NET is not drawn, the pad already shows the name */
+function padCover(){
+  const out=[]; if(!showComps) return out;
+  comps.forEach(c=>{ if(!showSide[c.side]) return;
+    if(isSOT(c)){ const k=mmScale||1, a=-(c.rot||0)*Math.PI/180;
+      c.pads.forEach(pd=>{ if(pd.net) out.push({net:pd.net,has:w=>{ const v=rotV({x:w.x-pd.x,y:w.y-pd.y},a);
+        return Math.abs(v.x)<=SOT23.pw/2*k&&Math.abs(v.y)<=SOT23.ph/2*k; }}); });
+      return; }
+    if(isIC(c)){ const G=icGeom(c);
+      c.pads.forEach((pd,i)=>{ if(!pd.net) return; const q0=G.P[i], u=G.U[i], nv=G.N[i];
+        out.push({net:pd.net,has:(w,q)=>{ const d={x:q.x-q0.x,y:q.y-q0.y};
+          return G.round?Math.hypot(d.x,d.y)<=G.rr:Math.abs(G.dot(d,u))<=G.pw/2&&Math.abs(G.dot(d,nv))<=G.pl/2; }}); });
+      return; }
+    const g=PKG[c.size]; if(!g) return; const k=mmScale||1, hl=g.L/2*k, hw=g.W/2*k, t=g.T*k, a=-(c.rot||0)*Math.PI/180;
+    [['n1',-1],['n2',1]].forEach(([key,sg])=>{ const net=c[key]; if(!net) return;
+      out.push({net,has:w=>{ const v=rotV({x:w.x-c.x,y:w.y-c.y},a), u=v.x*sg;
+        return u>=hl-t&&u<=hl&&Math.abs(v.y)<=hw; }}); });
+  });
+  return out;
 }
 function drawSOT(c,col,isSel){
   const k=mmScale||1, a=(c.rot||0)*Math.PI/180;
