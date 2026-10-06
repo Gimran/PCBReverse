@@ -1203,19 +1203,29 @@ function addIC(f){ /* placement frame -> new IC with pads on its border */
   selComp=c.id; renderComps(); drawMarks(); save();
 }
 const icPadR=()=>mmScale?Math.max(mmScale*.45,4/Math.abs(view.z)):10/Math.abs(view.z);   /* world radius of a pad */
+/* NET name inside a pad: font shrinks to fit w×h (screen px), skipped when it would be unreadable */
+function padNet(cx,cy,w,h,nc,hot){
+  if(!nc||!nc.name) return;
+  const fs=Math.min(9,(w-2)/(nc.name.length*.62),h*.9); if(fs<4.5) return;
+  const t=svg('text',{x:cx,y:cy,fill:nc.color,stroke:haloFor(nc.color),'stroke-width':Math.max(1.2,fs*.32),'paint-order':'stroke',
+    'font-size':fs.toFixed(2),'font-weight':500,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'});
+  t.textContent=nc.name; if(hot) t.setAttribute('data-hot',''); marks.appendChild(t);
+}
 function icBox(c){ const p=screenOf(c), w=Math.max(30,c.des.length*7.6+12); return {p,w,h:17}; }
 function drawIC(c,col,isSel){
   const b=icBox(c), P=c.pads.map(q=>screenOf(q));
   let pitch=Infinity; for(let i=1;i<P.length;i++) pitch=Math.min(pitch,Math.hypot(P[i].x-P[i-1].x,P[i].y-P[i-1].y));
-  P.forEach(q=>marks.appendChild(svg('line',{x1:b.p.x,y1:b.p.y,x2:q.x,y2:q.y,stroke:isSel?'#fff':col,
-    'stroke-width':isSel?1.2:.9,opacity:isSel?.85:.55})));                      /* elastic leads */
+  if(c.pat!=='l1') P.forEach(q=>marks.appendChild(svg('line',{x1:b.p.x,y1:b.p.y,x2:q.x,y2:q.y,stroke:isSel?'#fff':col,
+    'stroke-width':isSel?1.2:.9,opacity:isSel?.85:.55})));                      /* elastic leads (not for in-line connectors: they only clutter) */
+  const ds=Math.max(10,Math.min(44,(Number.isFinite(pitch)?pitch:20)*.85)), r=ds/2;   /* pad size follows the pitch on screen */
   c.pads.forEach((pd,i)=>{ const q=P[i], nc=pd.net&&nets.find(n=>n.id===pd.net), hot=nc&&hlNet===nc.id;
-    const fill=nc?nc.color:'rgba(210,210,210,.7)', st=hot?nc.color:(isSel?'#fff':col), sw=hot?2.4:(isSel?1.6:1.2);
-    const pe=marks.appendChild(i===0 ? svg('rect',{x:q.x-5,y:q.y-5,width:10,height:10,fill,stroke:st,'stroke-width':sw})   /* pin 1 square */
-                            : svg('circle',{cx:q.x,cy:q.y,r:5,fill,stroke:st,'stroke-width':sw}));
+    const fill='none', st=nc?nc.color:(isSel?'#fff':col), sw=hot?2.4:(isSel?1.8:1.3);   /* transparent pad, NET colour outline */
+    const pe=marks.appendChild(i===0 ? svg('rect',{x:q.x-r,y:q.y-r,width:ds,height:ds,fill,stroke:st,'stroke-width':sw})   /* pin 1 square */
+                            : svg('circle',{cx:q.x,cy:q.y,r,fill,stroke:st,'stroke-width':sw}));
     if(hot) pe.setAttribute('data-hot','');
-    if(pitch>13||isSel){ const dx=q.x-b.p.x, dy=q.y-b.p.y, d=Math.hypot(dx,dy)||1;
-      const t=svg('text',{x:q.x+dx/d*11,y:q.y+dy/d*11,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
+    padNet(q.x,q.y,ds*.82,ds*.5,nc,hot);
+    if(pitch>13||isSel){ const dx=q.x-b.p.x, dy=q.y-b.p.y, d=Math.hypot(dx,dy)||1, o=r+6;
+      const t=svg('text',{x:q.x+dx/d*o,y:q.y+dy/d*o,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
         'font-size':9.5,'font-weight':600,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'});
       t.textContent=String(pinNo(c,i)); marks.appendChild(t); } });
   marks.appendChild(svg('rect',{x:b.p.x-b.w/2,y:b.p.y-b.h/2,width:b.w,height:b.h,rx:3,fill:'rgba(10,14,12,.78)',
@@ -1447,17 +1457,24 @@ function drawComps(){
     [['p1',c.n1],['p2',c.n2]].forEach(([k,net])=>{
       const nc=net&&nets.find(n=>n.id===net);
       const hot=nc&&hlNet===nc.id;
-      const pe=poly(g[k], nc?nc.color:'rgba(210,210,210,.55)', hot?nc.color:(isSel?'#fff':col),
-           hot?2.4:(isSel?1.6:1), null, hot?1:.85);
+      const pe=poly(g[k], 'none', nc?nc.color:(isSel?'#fff':col),
+           hot?2.4:(isSel?1.8:1.3), null, hot?1:.9);   /* transparent pad, NET colour outline */
       if(hot) pe.setAttribute('data-hot','');
     });
     /* pin numbers — centred on pads, skipped when the part is too small on screen */
-    [['p1','1'],['p2','2']].forEach(([k,num])=>{
+    [['p1','1',c.n1],['p2','2',c.n2]].forEach(([k,num,net])=>{
       const q=g[k].map(scr);
       const pw=Math.min(Math.hypot(q[1].x-q[0].x,q[1].y-q[0].y),Math.hypot(q[2].x-q[1].x,q[2].y-q[1].y));
       if(pw<5) return;
-      const cx=q.reduce((a,p)=>a+p.x,0)/4, cy=q.reduce((a,p)=>a+p.y,0)/4;
-      const fs=Math.max(9,Math.min(14,pw*.8));
+      let cx=q.reduce((a,p)=>a+p.x,0)/4, cy=q.reduce((a,p)=>a+p.y,0)/4;
+      let fs=Math.max(9,Math.min(14,pw*.8));
+      const nc=net&&nets.find(n=>n.id===net);
+      if(nc){   /* inner box of the (possibly turned) pad: number on top, NET name below */
+        const xs=q.map(p=>p.x), ys=q.map(p=>p.y), a=((c.rot||0)%90+90)%90, k=a===0?1:.7;
+        const bw=(Math.max(...xs)-Math.min(...xs))*k, bh=(Math.max(...ys)-Math.min(...ys))*k;
+        fs=Math.max(7,Math.min(fs,bh*.38));
+        padNet(cx,cy+bh*.2,bw*.92,bh*.4,nc,hlNet===nc.id);
+        cy-=bh*.2; }
       const t=svg('text',{x:cx,y:cy,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
         'font-size':fs,'font-weight':600,'text-anchor':'middle','dominant-baseline':'central',
         'font-family':'IBM Plex Mono, monospace'});
