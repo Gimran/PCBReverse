@@ -95,8 +95,8 @@ svg.marks{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visi
 .panel{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;position:relative}
 @media (max-width:880px){ .panel{border-left:0;border-top:1px solid var(--line)} }
 .phead{padding:13px 16px 11px;border-bottom:1px solid var(--line)}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
-.lpanel .tabs{grid-template-columns:repeat(4,1fr) 30px 30px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line)}
+.lpanel .tabs{grid-template-columns:repeat(5,1fr) 30px 30px}
 html[lang="en"] [data-only="ru"],html[lang="ru"] [data-only="en"]{display:none!important}
 .tabs button{border:0;border-radius:0;background:transparent;box-shadow:none;padding:9px 4px;
   font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.05em;color:var(--muted);
@@ -110,6 +110,10 @@ html[lang="en"] [data-only="ru"],html[lang="ru"] [data-only="en"]{display:none!i
 
 .modes{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
 .modes.two{grid-template-columns:repeat(2,1fr)}
+.modes.five{grid-template-columns:repeat(5,1fr)}
+.modes.five .mini{font-size:14px;padding:3px 0}
+.conn{display:flex;flex-wrap:wrap;gap:4px}
+.conn button{padding:2px 6px;font-size:11px}
 .modes.three{grid-template-columns:repeat(3,1fr)}
 button{font:inherit;color:var(--text);background:var(--panel-2);border:1px solid var(--line);
   border-radius:4px;padding:6px 4px;cursor:pointer;box-shadow:var(--shadow)}
@@ -218,6 +222,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       <button data-ltab="layer" title="активный слой: выравнивание, удаление фона">СЛОЙ</button>
       <button data-ltab="warp" title="деформация по опорным точкам">ДЕФОРМ</button>
       <button data-ltab="comp" title="компоненты">КОМП</button>
+      <button data-ltab="draw" title="надписи и фигуры">РИС</button>
       <button data-ltab="keys" title="клавиши">?</button>
       <button id="langBtn" title="English">EN</button>
     </div>
@@ -231,6 +236,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <div class="row"><span class="lbl" style="flex:none">Показать</span>
             <button class="mini on" id="showNetsBtn" style="flex:1" title="точки всех NET">NETS</button>
             <button class="mini on" id="showCompsBtn" style="flex:1" title="все компоненты">компоненты</button>
+            <button class="mini on" id="showDrawBtn" style="flex:1" title="надписи и фигуры">рисунки</button>
           </div>
           <div class="row"><span class="lbl" style="flex:none">Вид</span>
             <button class="mini" id="vrotL" style="flex:1" title="повернуть вид на 90° влево (Shift+R)">↺ 90°</button>
@@ -320,6 +326,25 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           </div>
         </div>
       </div>
+      <div data-lpage="draw" hidden>
+        <div class="sect">
+          <button class="mini wide" id="drawBtn" title="надписи, стрелки, прямоугольники, круги поверх платы">Рисование (D)</button>
+          <div class="modes five" id="drawTools">
+            <button class="mini on" data-tool="sel" title="выбор: клик — выбрать, тянуть — двигать, маркеры — менять форму">↖</button>
+            <button class="mini" data-tool="text" title="надпись: клик — поставить, текст — во вкладке PROP">T</button>
+            <button class="mini" data-tool="arrow" title="стрелка: тянуть от начала к острию">➚</button>
+            <button class="mini" data-tool="rect" title="прямоугольник: тянуть по диагонали">▭</button>
+            <button class="mini" data-tool="circle" title="круг: тянуть от центра">◯</button>
+          </div>
+          <div class="row"><span class="lbl" style="flex:none;width:52px">цвет</span>
+            <input type="color" id="drawCol" value="#ffd400" title="цвет новых фигур и выбранной"></div>
+          <div class="row"><span class="lbl" style="flex:none;width:52px">линия</span>
+            <input type="range" id="drawW" min="1" max="10" step="1" value="2"><span class="val" id="drawWv">2</span></div>
+          <div class="row"><span class="lbl" style="flex:none;width:52px">текст</span>
+            <input type="range" id="drawFs" min="8" max="64" step="1" value="16"><span class="val" id="drawFsv">16</span></div>
+          <div class="status" id="drawStatus"></div>
+        </div>
+      </div>
       <div data-lpage="keys" hidden>
         <div class="sect">
           <div class="keys" data-only="ru">
@@ -329,7 +354,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>колесо</b> — зум · <b>средняя кнопка</b> — панорама<br><b>R</b> / <b>Shift+R</b> — поворот вида на 90°<br><b>H</b> / <b>V</b> — отражение вида<br>
             <b>M</b> — сдвиг слоя мышью и стрелками<br><b>F</b> — переворот платы<br>
             <b>[ ]</b> — поворот 0.1° · <b>Shift</b> — ×10<br>
-            <b>P</b> — опорные точки · <b>N</b> — редактирование NET · <b>K</b> — редактирование компонентов<br>
+            <b>P</b> — опорные точки · <b>N</b> — редактирование NET · <b>K</b> — редактирование компонентов · <b>D</b> — рисование<br>
             <b>Alt+клик</b> в режиме N — переходное отверстие (точка на обеих сторонах)<br>
             <b>Ctrl+клик</b> в режиме N — новый NET с первой точкой-via (сквозной), сразу ввод имени<br>
             <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> / <b>Delete</b> — удалить (только в режимах N / K) · <b>Esc</b> — выход
@@ -341,7 +366,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>wheel</b> — zoom · <b>middle button</b> — pan<br><b>R</b> / <b>Shift+R</b> — rotate view 90°<br><b>H</b> / <b>V</b> — mirror view<br>
             <b>M</b> — move the layer with mouse and arrows<br><b>F</b> — flip board<br>
             <b>[ ]</b> — rotate 0.1° · <b>Shift</b> — ×10<br>
-            <b>P</b> — reference points · <b>N</b> — edit NETs · <b>K</b> — edit components<br>
+            <b>P</b> — reference points · <b>N</b> — edit NETs · <b>K</b> — edit components · <b>D</b> — drawing<br>
             <b>Alt+click</b> in N mode — via (point on both sides)<br>
             <b>Ctrl+click</b> in N mode — new NET whose first point is a via, then type its name<br>
             <b>Space</b> / <b>Shift+Space</b> — rotate component 45°<br><b>right-click</b> / <b>Delete</b> — delete (N / K modes only) · <b>Esc</b> — exit mode
@@ -397,10 +422,6 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
         <div class="status" id="compStatus"></div>
       </div>
 
-      <div class="sect">
-        <div class="lbl">Свойства выбранного</div>
-        <div class="props" id="compProps"><div class="empty">Компонент не выбран.</div></div>
-      </div>
 
       <div class="sect">
         <div class="row">
@@ -433,6 +454,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       <button class="on" data-tab="view">СЛОИ</button>
       <button data-tab="nets">NETS</button>
       <button data-tab="video" title="экспериментально: камера / USB-микроскоп">ВИДЕО</button>
+      <button data-tab="prop" title="свойства выбранного: компонент, точка NET, NET, рисунок">PROP</button>
     </div>
 
     <div class="pages">
@@ -487,6 +509,13 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       <div data-page="video" hidden>
         <div class="sect" id="vidRows" style="gap:8px"></div>
         <div class="sect" id="vidWinBox" hidden><video id="vidWin" muted playsinline autoplay></video></div>
+      </div>
+      <div data-page="prop" hidden>
+        <div class="sect" id="propEmpty"><div class="empty">Ничего не выбрано — выберите компонент, точку NET или рисунок.</div></div>
+        <div class="sect" id="propCompS" hidden><div class="lbl">Компонент</div><div class="props" id="compProps"></div></div>
+        <div class="sect" id="propPointS" hidden><div class="lbl">Точка NET</div><div class="props" id="pointProps"></div></div>
+        <div class="sect" id="propNetS" hidden><div class="lbl">NET</div><div class="props" id="netProps"></div></div>
+        <div class="sect" id="propNoteS" hidden><div class="lbl">Рисунок</div><div class="props" id="noteProps"></div></div>
       </div>
     </div>
   </div>
@@ -546,6 +575,16 @@ const I18N={
   'редактирование компонентов: выбор, перетаскивание, поворот, удаление':'edit components: select, move, rotate, delete','Правка (K)':'Edit (K)',
   'ставить новые компоненты выбранного типа; Esc или повторное нажатие — закончить':'place new components of the chosen type; Esc or press again — finish',
   'Редактирование компонентов (K)':'Edit components (K)','Свойства выбранного':'Selected part','Компонент не выбран.':'No component selected.',
+  'РИС':'DRAW','надписи и фигуры':'labels and shapes','Рисование (D)':'Drawing (D)',
+  'надписи, стрелки, прямоугольники, круги поверх платы':'labels, arrows, rectangles, circles over the board',
+  'выбор: клик — выбрать, тянуть — двигать, маркеры — менять форму':'select: click — pick, drag — move, handles — reshape',
+  'надпись: клик — поставить, текст — во вкладке PROP':'label: click — place, text — in the PROP tab',
+  'стрелка: тянуть от начала к острию':'arrow: drag from tail to tip','прямоугольник: тянуть по диагонали':'rectangle: drag along the diagonal',
+  'круг: тянуть от центра':'circle: drag from the centre','цвет':'color','линия':'line','текст':'text',
+  'цвет новых фигур и выбранной':'color of new shapes and the selected one','рисунки':'drawings',
+  'свойства выбранного: компонент, точка NET, NET, рисунок':'selection properties: component, NET point, NET, drawing',
+  'Ничего не выбрано — выберите компонент, точку NET или рисунок.':'Nothing selected — pick a component, a NET point or a drawing.',
+  'Компонент':'Component','Точка NET':'NET point','Рисунок':'Drawing',
   'цвет компонентов top':'top component color','цвет компонентов bot':'bot component color','актив: —':'active: —',
   'экспериментально: камера / USB-микроскоп':'experimental: camera / USB microscope',
   'новый слой на текущей стороне платы; сразу выбрать картинку':'new layer on the current board side; pick an image right away',
@@ -1002,6 +1041,7 @@ function drawMarks(){
     if(labels) txt(p,net.color,net.name,op);
   });
   drawComps();
+  drawNotes();
   if(clickMode==='move') drawLayerBox();
   if(clickMode==='crop') drawCropBox();
 }
@@ -1184,6 +1224,154 @@ function icAutoPins(c){ /* nearest visible NET point within a pad radius sets th
     if(best&&pd.net!==best){ pd.net=best; ch=true; } });
   return ch;
 }
+/* ---------- DRAW: labels and shapes in world coords, shown on their board side (or with XRAY) ---------- */
+let notes=[], selNote=null, drawTool='sel', showDraw=true, drawStyle={col:'#ffd400',w:2,fs:16};
+const noteShown=n=>showDraw&&(xray||n.side==='any'||n.side===boardSide);
+const nid=()=>'d'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+function segD(p,a,b){ const vx=b.x-a.x, vy=b.y-a.y, l=vx*vx+vy*vy||1;
+  const t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l)); return Math.hypot(p.x-a.x-t*vx,p.y-a.y-t*vy); }
+function noteGeom(n){ /* screen geometry */
+  if(n.t==='text'){ const p=screenOf(n.a), w=Math.max(1,(n.txt||'').length)*n.fs*.6;
+    return {p, box:{x0:p.x-3,y0:p.y-n.fs*.65,x1:p.x+w+3,y1:p.y+n.fs*.65}}; }
+  if(n.t==='circle') return {c:screenOf(n.a), r:Math.abs((n.r||0)*view.z)};
+  if(n.t==='rect') return {q:[{x:n.a.x,y:n.a.y},{x:n.b.x,y:n.a.y},{x:n.b.x,y:n.b.y},{x:n.a.x,y:n.b.y}].map(screenOf)};
+  return {A:screenOf(n.a), B:screenOf(n.b)};
+}
+function noteHandles(n){ const g=noteGeom(n);
+  if(n.t==='text') return [{k:'a',p:g.p}];
+  if(n.t==='circle') return [{k:'a',p:g.c},{k:'r',p:{x:g.c.x+g.r,y:g.c.y}}];
+  if(n.t==='rect') return [{k:'a',p:g.q[0]},{k:'b',p:g.q[2]}];
+  return [{k:'a',p:g.A},{k:'b',p:g.B}];
+}
+function drawNotes(){
+  notes.forEach(n=>{ if(!noteShown(n)) return;
+    const g=noteGeom(n), col=n.col||'#ffd400', w=n.w||2, hc=haloFor(col);
+    const both=(tag,a)=>{ marks.appendChild(svg(tag,{...a,fill:'none',stroke:hc,'stroke-width':w+3,opacity:.5,'stroke-linecap':'round','stroke-linejoin':'round'}));
+      marks.appendChild(svg(tag,{...a,fill:'none',stroke:col,'stroke-width':w,'stroke-linecap':'round','stroke-linejoin':'round'})); };
+    if(n.t==='text'){ const t=svg('text',{x:g.p.x,y:g.p.y,fill:col,'font-size':n.fs||16,'font-weight':600,'dominant-baseline':'central',
+        'font-family':'IBM Plex Sans, sans-serif',stroke:hc,'stroke-width':Math.max(3,(n.fs||16)/5),'paint-order':'stroke','stroke-linejoin':'round'});
+      t.textContent=n.txt||''; marks.appendChild(t); }
+    else if(n.t==='circle') both('circle',{cx:g.c.x,cy:g.c.y,r:g.r});
+    else if(n.t==='rect') both('polygon',{points:g.q.map(q=>q.x+','+q.y).join(' ')});
+    else { const d=Math.hypot(g.B.x-g.A.x,g.B.y-g.A.y)||1, ux=(g.B.x-g.A.x)/d, uy=(g.B.y-g.A.y)/d, h=Math.max(10,w*4), hw=h*.55;
+      const base={x:g.B.x-ux*h*.8,y:g.B.y-uy*h*.8};
+      both('line',{x1:g.A.x,y1:g.A.y,x2:base.x,y2:base.y});
+      const tri=[g.B,{x:g.B.x-ux*h-uy*hw,y:g.B.y-uy*h+ux*hw},{x:g.B.x-ux*h+uy*hw,y:g.B.y-uy*h-ux*hw}];
+      marks.appendChild(svg('polygon',{points:tri.map(q=>q.x+','+q.y).join(' '),fill:col,stroke:hc,'stroke-width':1.2,'stroke-linejoin':'round'})); }
+    if(n.id===selNote&&clickMode==='draw') noteHandles(n).forEach(hh=>marks.appendChild(svg('rect',
+      {x:hh.p.x-4,y:hh.p.y-4,width:8,height:8,fill:'#fff',stroke:'#000','stroke-width':1})));
+  });
+}
+function hitNote(e){ /* -> {n, h?} ; handles of the selected shape first */
+  const m=evXY(e), s0=notes.find(o=>o.id===selNote);
+  if(s0&&noteShown(s0)){ const hh=noteHandles(s0).find(q=>Math.hypot(q.p.x-m.x,q.p.y-m.y)<=7); if(hh) return {n:s0,h:hh.k}; }
+  let best=null, bd=7;
+  notes.forEach(n=>{ if(!noteShown(n)) return; const g=noteGeom(n); let d=Infinity;
+    if(n.t==='text'){ const b=g.box; if(m.x>=b.x0&&m.x<=b.x1&&m.y>=b.y0&&m.y<=b.y1) d=0; }
+    else if(n.t==='circle') d=Math.abs(Math.hypot(m.x-g.c.x,m.y-g.c.y)-g.r);
+    else if(n.t==='rect') d=Math.min(...[0,1,2,3].map(i=>segD(m,g.q[i],g.q[(i+1)%4])));
+    else d=segD(m,g.A,g.B);
+    d-=(n.w||0)/2; if(d<bd){ bd=d; best={n}; } });
+  return best;
+}
+function delNote(id){ notes=notes.filter(o=>o.id!==id); if(selNote===id) selNote=null; renderProp(); drawMarks(); save(); }
+function syncDraw(){
+  $('drawBtn').classList.toggle('on',clickMode==='draw');
+  document.querySelectorAll('#drawTools [data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===drawTool));
+  if(document.activeElement!==$('drawCol')) $('drawCol').value=drawStyle.col;
+  $('drawW').value=drawStyle.w; $('drawWv').textContent=drawStyle.w; $('drawFs').value=drawStyle.fs; $('drawFsv').textContent=drawStyle.fs;
+  $('showDrawBtn').classList.toggle('on',showDraw);
+  $('drawStatus').innerHTML = clickMode!=='draw'
+    ? L('Включите «Рисование (D)» или выберите инструмент.','Turn on “Drawing (D)” or pick a tool.')
+    : ({sel:L('Клик — выбрать фигуру, тянуть — двигать, белые маркеры — менять форму. Delete / правый клик — удалить.',
+              'Click — pick a shape, drag — move, white handles — reshape. Delete / right-click — delete.'),
+        text:L('Клик — поставить надпись; текст правится во вкладке PROP.','Click — place a label; edit its text in the PROP tab.'),
+        arrow:L('Тяните от начала к острию.','Drag from the tail to the tip.'),
+        rect:L('Тяните по диагонали.','Drag along the diagonal.'),
+        circle:L('Тяните от центра наружу.','Drag from the centre outwards.')})[drawTool];
+}
+
+/* ---------- PROP tab: properties of the selected component / NET point / NET / drawing ---------- */
+function focusProp(id){ if(document.querySelector('[data-page="prop"]').hidden) document.querySelector('[data-tab="prop"]').click();
+  const i=$(id); if(i){ i.focus(); if(i.select) i.select(); } }
+function propRow(box,label,node){ const r=document.createElement('div'); r.className='row';
+  const l=document.createElement('span'); l.className='lbl'; l.style.flex='none'; l.style.width='64px'; l.textContent=label;
+  r.append(l,node); box.appendChild(r); return r; }
+function mkSelect(opts,val,fn){ const x=document.createElement('select'); x.className='slim';
+  opts.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; x.appendChild(o); });
+  x.value=val; x.onchange=()=>fn(x.value); return x; }
+function lockBox(box,mode,tip){ if(clickMode===mode) return;
+  box.querySelectorAll('input,select,button:not(.free)').forEach(n=>n.disabled=true);
+  const h=document.createElement('div'); h.className='empty'; h.textContent=tip; box.appendChild(h); }
+function netPins(netId){ /* component pins on a NET: [{c,label}] */
+  const out=[];
+  comps.forEach(c=>{ if(isIC(c)) c.pads.forEach((pd,i)=>{ if(pd.net===netId) out.push({c,label:c.des+'.'+pinNo(c,i)}); });
+    else [['n1','1'],['n2','2']].forEach(([k,n])=>{ if(c[k]===netId) out.push({c,label:c.des+'.'+n}); }); });
+  return out;
+}
+function renderPointProps(pt){
+  const box=$('pointProps'); box.innerHTML=''; if(!pt) return;
+  propRow(box,'NET',mkSelect(nets.map(n=>[n.id,n.name]),pt.net,v=>{ pt.net=v; activeNet=hlNet=v; renderNets(); renderProp(); drawMarks(); save(); }));
+  propRow(box,L('тип','type'),mkSelect([['pt',L('обычная','plain')],['via',L('сквозная (via)','through (via)')]],pt.via?'via':'pt',
+    v=>{ if(v==='via') pt.via=true; else { delete pt.via; pt.side=pt.side||boardSide; } renderProp(); drawMarks(); save(); }));
+  if(!pt.via) propRow(box,L('сторона','side'),mkSelect([['top','TOP'],['bot','BOT']],pt.side||(byId(pt.layer)||{}).side||boardSide,
+    v=>{ pt.side=v; renderProp(); drawMarks(); save(); }));
+  const lay=byId(pt.layer), ln=document.createElement('span'); ln.className='val'; ln.style.textAlign='left'; ln.style.flex='1';
+  ln.textContent=lay?lay.name:'—'; propRow(box,L('слой','layer'),ln);
+  const del=document.createElement('button'); del.className='mini wide'; del.textContent=L('Удалить точку','Delete point');
+  del.onclick=()=>{ points=points.filter(p=>p.id!==pt.id); selPoint=null; renderNets(); renderProp(); drawMarks(); sync(); save(); };
+  box.appendChild(del);
+  lockBox(box,'net',L('Правка — в режиме «Редактирование NET» (N).','Editing — in “Edit NETs” mode (N).'));
+}
+function renderNetProps(net){
+  const box=$('netProps'); box.innerHTML=''; if(!net) return;
+  const nm=document.createElement('input'); nm.type='text'; nm.value=net.name; nm.className='free';
+  nm.oninput=()=>{ net.name=nm.value; renderNets(); drawMarks(); save(); };
+  nm.onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape') nm.blur(); };
+  propRow(box,L('имя','name'),nm);
+  const r=document.createElement('div'); r.className='row'; r.style.flex='1';
+  const col=document.createElement('input'); col.type='color'; col.value=net.color; col.oninput=()=>{ net.color=col.value; renderNets(); drawMarks(); save(); };
+  const eye=document.createElement('button'); eye.className='mini free'; eye.textContent=net.on?L('видим','shown'):L('скрыт','hidden');
+  eye.onclick=()=>{ net.on=!net.on; renderNets(); renderProp(); drawMarks(); save(); };
+  const cnt=document.createElement('span'); cnt.className='val'; cnt.textContent=points.filter(p=>p.net===net.id).length+L(' точ.',' pts');
+  r.append(col,eye,cnt); propRow(box,L('цвет','color'),r);
+  const pins=netPins(net.id), cn=document.createElement('div'); cn.className='conn';
+  if(!pins.length){ const e=document.createElement('span'); e.className='empty'; e.textContent=L('выводов нет','no pins'); cn.appendChild(e); }
+  pins.forEach(pp=>{ const b=document.createElement('button'); b.className='mini free'; b.textContent=pp.label;
+    b.title=L('выбрать компонент','select the component');
+    b.onclick=()=>{ selComp=pp.c.id; renderComps(); drawMarks(); sync(); }; cn.appendChild(b); });
+  propRow(box,L('выводы','pins'),cn);
+}
+function renderNoteProps(n){
+  const box=$('noteProps'); box.innerHTML=''; if(!n) return;
+  const kind={text:L('надпись','label'),arrow:L('стрелка','arrow'),rect:L('прямоугольник','rectangle'),circle:L('круг','circle')}[n.t];
+  const k=document.createElement('span'); k.className='val'; k.style.textAlign='left'; k.style.flex='1'; k.textContent=kind;
+  propRow(box,L('фигура','shape'),k);
+  if(n.t==='text'){ const t=document.createElement('input'); t.type='text'; t.id='noteTxt'; t.value=n.txt||'';
+    t.oninput=()=>{ n.txt=t.value; drawMarks(); save(); }; t.onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape') t.blur(); };
+    propRow(box,L('текст','text'),t); }
+  const col=document.createElement('input'); col.type='color'; col.value=n.col||'#ffd400';
+  col.oninput=()=>{ n.col=drawStyle.col=col.value; drawMarks(); syncDraw(); save(); }; propRow(box,L('цвет','color'),col);
+  const key=n.t==='text'?'fs':'w', mn=n.t==='text'?8:1, mx=n.t==='text'?64:10;
+  const rr=document.createElement('div'); rr.className='row'; rr.style.flex='1';
+  const sl=document.createElement('input'); sl.type='range'; sl.min=mn; sl.max=mx; sl.value=n[key];
+  const sv=document.createElement('span'); sv.className='val'; sv.textContent=n[key];
+  sl.oninput=()=>{ n[key]=drawStyle[key]=+sl.value; sv.textContent=sl.value; drawMarks(); syncDraw(); save(); };
+  rr.append(sl,sv); propRow(box,n.t==='text'?L('размер','size'):L('линия','line'),rr);
+  propRow(box,L('сторона','side'),mkSelect([['any',L('обе','both')],['top','TOP'],['bot','BOT']],n.side||'any',v=>{ n.side=v; drawMarks(); save(); }));
+  const del=document.createElement('button'); del.className='mini wide'; del.textContent=L('Удалить','Delete'); del.onclick=()=>delNote(n.id);
+  box.appendChild(del);
+  lockBox(box,'draw',L('Правка — в режиме «Рисование» (D).','Editing — in “Drawing” mode (D).'));
+}
+let propKey='';
+function renderProp(){
+  const c=comps.find(o=>o.id===selComp), pt=points.find(q=>q.id===selPoint), n=notes.find(o=>o.id===selNote);
+  const net=nets.find(x=>x.id===(pt?pt.net:hlNet));
+  $('propCompS').hidden=!c; $('propPointS').hidden=!pt; $('propNetS').hidden=!net; $('propNoteS').hidden=!n;
+  $('propEmpty').hidden=!!(c||pt||net||n);
+  renderPropsComp(); renderPointProps(pt); renderNetProps(net); renderNoteProps(n);
+  propKey=[selComp,selPoint,selNote,hlNet,clickMode,nets.length,comps.length,notes.length].join('|');
+}
 function drawComps(){
   if(!comps.length&&!calib) return;
   const poly=(pts,fill,stroke,wd,dash,op)=>{
@@ -1347,7 +1535,8 @@ function renderComps(){
   $('showTop').classList.toggle('on',showSide.top);
   $('showBot').classList.toggle('on',showSide.bot);
 }
-function renderProps(){
+function renderProps(){ renderProp(); }   /* PROP tab renders every selection */
+function renderPropsComp(){
   const box=$('compProps'); box.innerHTML='';
   const c=comps.find(o=>o.id===selComp);
   if(!c){ const d=document.createElement('div'); d.className='empty';
@@ -1720,6 +1909,8 @@ function autoCompSide(){
   compSideKey=k; compSide=(l&&(l.side==='top'||l.side==='bot'))?l.side:boardSide;
 }
 function sync(){
+  if(booted){ const k=[selComp,selPoint,selNote,hlNet,clickMode,nets.length,comps.length,notes.length].join('|');
+    if(k!==propKey) renderProp(); }   /* PROP follows selection / mode changes */
   autoCompSide();
   const s=sel_(), r=byId(refId);
   const warped=!!(s&&s.H);
@@ -1789,6 +1980,7 @@ function sync(){
     $('keyPick').hidden=!window.EyeDropper; }
   syncCor();
   $('showNetsBtn').classList.toggle('on',showNets); $('showCompsBtn').classList.toggle('on',showComps);
+  syncDraw();
   if(clickMode!=='move') vp.style.cursor='';
   $('vrotv').textContent=view.rot+'°';
   $('vflipH').classList.toggle('on',!!view.fh); $('vflipV').classList.toggle('on',!!view.fv);
@@ -1806,7 +1998,7 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, icPin0, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, icPin0, compVal, sideCol:SIDECOL, showSide, showNets, showComps, notes, showDraw, drawStyle, warpModel, imgDir, projName};
 }
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
@@ -1844,6 +2036,8 @@ function restore(s){
   compVal=Object.assign({R:'',C:''},s.compVal||{});
   SIDECOL=Object.assign({...SIDECOL_DEF},s.sideCol||{});
   showNets=s.showNets!==false; showComps=s.showComps!==false;
+  notes=Array.isArray(s.notes)?s.notes:[]; showDraw=s.showDraw!==false; selNote=null;
+  drawStyle=Object.assign({col:'#ffd400',w:2,fs:16},s.drawStyle||{});
   showSide=Object.assign({top:true,bot:true},s.showSide||{});
   selComp=null; calib=null; warpModel=s.warpModel==='persp'?'persp':'affine';
   if(typeof s.projName==='string'&&s.projName) projName=s.projName;
@@ -2074,6 +2268,17 @@ vp.addEventListener('pointerdown',e=>{
     vp.classList.add('grabbing'); vp.setPointerCapture(e.pointerId); return; }
   if(e.button!==0)return;
   if(e.target===handle){drag={t:'swipe'};vp.setPointerCapture(e.pointerId);return;}
+  if(clickMode==='draw'){
+    const m=worldFromEvent(e), h=hitNote(e);
+    if(h){ selNote=h.n.id; renderProp();
+      drag={t:'note',id:h.n.id,h:h.h||null,x:e.clientX,y:e.clientY,moved:false,o:JSON.parse(JSON.stringify(h.n))};
+      vp.setPointerCapture(e.pointerId); drawMarks(); return; }
+    if(drawTool==='arrow'||drawTool==='rect'||drawTool==='circle'){
+      const n={id:nid(),t:drawTool,a:{x:m.x,y:m.y},b:{x:m.x,y:m.y},r:0,col:drawStyle.col,w:drawStyle.w,side:boardSide};
+      if(n.t==='circle') delete n.b; else delete n.r;
+      notes.push(n); selNote=n.id; drag={t:'nnew',id:n.id,x:e.clientX,y:e.clientY,moved:false};
+      vp.setPointerCapture(e.pointerId); return; }
+    drag={t:'click',x:e.clientX,y:e.clientY,moved:false}; vp.setPointerCapture(e.pointerId); return; }
   if(clickMode==='move'){
     const hb=hitLayerBox(e);
     if(hb==='piv'){ drag={t:'piv',x:e.clientX,y:e.clientY,moved:false}; vp.setPointerCapture(e.pointerId); return; }
@@ -2173,6 +2378,14 @@ vp.addEventListener('pointermove',e=>{
     }
     for(const k in c) c[k]=Math.round(c[k]*10)/10;
     s.crop=(c.x0<=0&&c.y0<=0&&c.x1>=s.w&&c.y1>=s.h)?null:c; applyLayer(s); return; }
+  if(drag.t==='note'){ const n=notes.find(o=>o.id===drag.id); if(!n)return;
+    const d=screenDelta(dx,dy), o=drag.o, w=worldFromEvent(e);
+    if(!drag.h||(drag.h==='a'&&n.t==='circle')){ n.a={x:o.a.x+d.x,y:o.a.y+d.y}; if(o.b&&!drag.h) n.b={x:o.b.x+d.x,y:o.b.y+d.y}; }
+    else if(drag.h==='r') n.r=Math.hypot(w.x-n.a.x,w.y-n.a.y);
+    else n[drag.h]={x:w.x,y:w.y};
+    drawMarks(); return; }
+  if(drag.t==='nnew'){ const n=notes.find(o=>o.id===drag.id); if(!n)return; const w=worldFromEvent(e);
+    if(n.t==='circle') n.r=Math.hypot(w.x-n.a.x,w.y-n.a.y); else n.b={x:w.x,y:w.y}; drawMarks(); return; }
   if(drag.t==='comp'){const c=comps.find(o=>o.id===drag.id); if(!c)return;
     const d=screenDelta(dx,dy); c.x=drag.ox+d.x; c.y=drag.oy+d.y;
     if(drag.pads) c.pads.forEach((pd,i)=>{ pd.x=drag.pads[i].x+d.x; pd.y=drag.pads[i].y+d.y; });
@@ -2196,6 +2409,10 @@ vp.addEventListener('pointerup',e=>{
     if(f.x1-f.x0>=8||f.y1-f.y0>=8) addIC(f);
     else { selComp=null; renderComps(); drawMarks(); }   /* short click on empty: deselect, Space turns the pictogram again */
     syncComps(); return; }
+  if(d&&d.t==='note'){ if(d.moved) save(); renderProp(); drawMarks(); return; }
+  if(d&&d.t==='nnew'){ const n=notes.find(o=>o.id===d.id);
+    if(n&&!d.moved){ notes=notes.filter(o=>o!==n); selNote=null; } else save();   /* a click is not a shape */
+    renderProp(); drawMarks(); return; }
   if(!d||d.moved||d.t!=='click')return;
   const m=worldFromEvent(e), s=sel_();
   if(clickMode==='calib'){
@@ -2204,6 +2421,11 @@ vp.addEventListener('pointerup',e=>{
     else { calib.x=m.x; calib.y=m.y; }
     drawMarks(); syncComps(); save(); return;
   }
+  if(clickMode==='draw'){
+    if(drawTool==='text'){ const n={id:nid(),t:'text',a:{x:m.x,y:m.y},txt:L('текст','text'),col:drawStyle.col,fs:drawStyle.fs,w:0,side:boardSide};
+      notes.push(n); selNote=n.id; save(); renderProp(); drawMarks(); focusProp('noteTxt'); }   /* type the text right away */
+    else { selNote=null; renderProp(); drawMarks(); }
+    return; }
   if(clickMode==='comp'){
     const hc=hitComp(m);
     if(hc){ selComp=hc.id; renderComps(); }
@@ -2246,7 +2468,8 @@ vp.addEventListener('pointerup',e=>{
   drawMarks();
 });
 vp.addEventListener('contextmenu',e=>{ /* delete only in the matching edit mode */
-  if(clickMode==='comp'||clickMode==='net') e.preventDefault();
+  if(clickMode==='comp'||clickMode==='net'||clickMode==='draw') e.preventDefault();
+  if(clickMode==='draw'){ const h=hitNote(e); if(h) delNote(h.n.id); return; }
   const mm=worldFromEvent(e);
   const hc=clickMode==='comp'&&hitComp(mm);
   if(hc){ e.preventDefault(); comps=comps.filter(o=>o.id!==hc.id);
@@ -2438,6 +2661,16 @@ $('keyPick').onclick=async()=>{ const l=sel_(); if(!l||!window.EyeDropper)return
   try{ const r=await new EyeDropper().open(); l.kc=r.sRGBHex; l.kOn=true; applyLayer(l); sync(); }catch(err){} };
 $('showNetsBtn').onclick=()=>{showNets=!showNets;sync();drawMarks();save()};
 $('showCompsBtn').onclick=()=>{showComps=!showComps;sync();drawMarks();save()};
+$('showDrawBtn').onclick=()=>{showDraw=!showDraw;sync();drawMarks();save()};
+$('drawBtn').onclick=()=>{ clickMode=clickMode==='draw'?'none':'draw'; if(clickMode==='draw'){ showDraw=true; pending=null; calib=null; }
+  sync(); drawMarks(); };
+document.querySelectorAll('#drawTools [data-tool]').forEach(b=>b.onclick=()=>{ drawTool=b.dataset.tool;
+  if(clickMode!=='draw'){ clickMode='draw'; showDraw=true; pending=null; calib=null; } sync(); drawMarks(); });
+const styleSel=(k,v)=>{ drawStyle[k]=v; const n=notes.find(o=>o.id===selNote);
+  if(n&&clickMode==='draw'&&((k==='fs')===(n.t==='text')||k==='col')) n[k]=v; syncDraw(); renderProp(); drawMarks(); save(); };
+$('drawCol').oninput=e=>styleSel('col',e.target.value);
+$('drawW').oninput=e=>styleSel('w',+e.target.value);
+$('drawFs').oninput=e=>styleSel('fs',+e.target.value);
 $('delPoint').onclick=()=>{points=points.filter(p=>p.id!==selPoint);selPoint=null;renderNets();drawMarks();sync();save()};
 $('clearNetPts').onclick=()=>{points=points.filter(p=>p.net!==activeNet);selPoint=null;renderNets();drawMarks();sync();save()};
 $('labelsBtn').onclick=()=>{labels=!labels;sync();drawMarks();save()};
@@ -2478,9 +2711,11 @@ addEventListener('keydown',e=>{
     case 'v':case 'V':case 'м':case 'М':$('vflipV').click();return;
     case 'p':case 'P':case 'з':case 'З':$('pickBtn').click();return;
     case 'n':case 'N':case 'т':case 'Т':$('netPickBtn').click();return;
+    case 'd':case 'D':case 'в':case 'В':$('drawBtn').click();return;
     case 'Delete':
       if(clickMode==='comp'&&selComp){comps=comps.filter(o=>o.id!==selComp);selComp=null;renderComps();drawMarks();save();}
       else if(clickMode==='net'&&selPoint)$('delPoint').click();
+      else if(clickMode==='draw'&&selNote) delNote(selNote);
       return;
     case 'k':case 'K':case 'л':case 'Л':if(!$('compPick').disabled)$('compPick').click();return;
     case 'm':case 'M':case 'ь':case 'Ь':if(!$('moveBtn').disabled)$('moveBtn').click();return;
