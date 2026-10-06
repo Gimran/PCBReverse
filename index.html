@@ -1212,20 +1212,66 @@ function padNet(cx,cy,w,h,nc,hot){
   t.textContent=nc.name; if(hot) t.setAttribute('data-hot',''); marks.appendChild(t);
 }
 function icBox(c){ const p=screenOf(c), w=Math.max(30,c.des.length*7.6+12); return {p,w,h:17}; }
+/* pad index groups per package side, in icLayout order (pin 1 first) */
+function icSides(c){ const n=c.pads.length, ix=(a,b)=>Array.from({length:b-a},(_,i)=>a+i);
+  if(c.pat==='l1') return [ix(0,n)];
+  if(c.pat==='q4'){ const k=[0,1,2,3].map(j=>Math.floor(n/4)+(j<n%4?1:0)); let o=0;
+    return k.map(kk=>{ const r=ix(o,o+kk); o+=kk; return r; }).filter(g=>g.length); }
+  const h=Math.ceil(n/2); return [ix(0,h),ix(h,n)].filter(g=>g.length);
+}
+/* label text along direction nv from point q: never upside down */
+function dirText(q,nv,str,fs,fill,halo,hot){
+  let ang=Math.atan2(nv.y,nv.x)*180/Math.PI, anchor='start';
+  if(ang>90||ang<=-90){ ang+=180; anchor='end'; }
+  const t=svg('text',{x:q.x,y:q.y,fill,stroke:halo,'stroke-width':Math.max(1.4,fs*.34),'paint-order':'stroke',
+    'font-size':fs.toFixed(2),'font-weight':500,'text-anchor':anchor,'dominant-baseline':'central',
+    'font-family':'IBM Plex Mono, monospace',transform:`rotate(${ang.toFixed(2)} ${q.x} ${q.y})`});
+  t.textContent=str; if(hot) t.setAttribute('data-hot',''); marks.appendChild(t);
+}
 function drawIC(c,col,isSel){
-  const b=icBox(c), P=c.pads.map(q=>screenOf(q));
-  let pitch=Infinity; for(let i=1;i<P.length;i++) pitch=Math.min(pitch,Math.hypot(P[i].x-P[i-1].x,P[i].y-P[i-1].y));
-  if(c.pat!=='l1') P.forEach(q=>marks.appendChild(svg('line',{x1:b.p.x,y1:b.p.y,x2:q.x,y2:q.y,stroke:isSel?'#fff':col,
-    'stroke-width':isSel?1.2:.9,opacity:isSel?.85:.55})));                      /* elastic leads (not for in-line connectors: they only clutter) */
-  const ds=Math.max(10,Math.min(44,(Number.isFinite(pitch)?pitch:20)*.85)), r=ds/2;   /* pad size follows the pitch on screen */
-  c.pads.forEach((pd,i)=>{ const q=P[i], nc=pd.net&&nets.find(n=>n.id===pd.net), hot=nc&&hlNet===nc.id;
-    const fill='none', st=nc?nc.color:(isSel?'#fff':col), sw=hot?2.4:(isSel?1.8:1.3);   /* transparent pad, NET colour outline */
-    const pe=marks.appendChild(i===0 ? svg('rect',{x:q.x-r,y:q.y-r,width:ds,height:ds,fill,stroke:st,'stroke-width':sw})   /* pin 1 square */
-                            : svg('circle',{cx:q.x,cy:q.y,r,fill,stroke:st,'stroke-width':sw}));
-    if(hot) pe.setAttribute('data-hot','');
-    padNet(q.x,q.y,ds*.82,ds*.5,nc,hot);
-    if(pitch>13||isSel){ const dx=q.x-b.p.x, dy=q.y-b.p.y, d=Math.hypot(dx,dy)||1, o=r+6;
-      const t=svg('text',{x:q.x+dx/d*o,y:q.y+dy/d*o,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
+  const b=icBox(c), P=c.pads.map(q=>screenOf(q)), n=P.length, conn=c.pat==='l1';
+  const C=P.reduce((a,q)=>({x:a.x+q.x/n,y:a.y+q.y/n}),{x:0,y:0});
+  const nrm=v=>{ const d=Math.hypot(v.x,v.y); return d>1e-6?{x:v.x/d,y:v.y/d}:null; };
+  const dot=(a,v)=>a.x*v.x+a.y*v.y, sub=(a,q)=>({x:a.x-q.x,y:a.y-q.y});
+  const sides=icSides(c), U=[], N=[]; let pitch=Infinity, depth=Infinity;
+  sides.forEach(g=>{
+    for(let i=1;i<g.length;i++) pitch=Math.min(pitch,Math.hypot(P[g[i]].x-P[g[i-1]].x,P[g[i]].y-P[g[i-1]].y));
+    let u=g.length>1&&nrm(sub(P[g[g.length-1]],P[g[0]]));
+    if(!u){ const d=nrm(sub(C,P[g[0]])); u=d?{x:-d.y,y:d.x}:{x:0,y:1}; }
+    let nv={x:-u.y,y:u.x};
+    if(conn){ /* label side of a connector: right (= below for a horizontal row) / left */
+      const right=Math.abs(nv.x)>.3?nv.x>0:nv.y>0; if(right!==(c.ls!=='l')) nv={x:-nv.x,y:-nv.y}; }
+    else{ if(dot(sub(C,P[g[0]]),nv)<0) nv={x:-nv.x,y:-nv.y};   /* inward */
+      depth=Math.min(depth,Math.max(...P.map(q=>dot(sub(q,P[g[0]]),nv)))); }
+    g.forEach(i=>{ U[i]=u; N[i]=nv; }); });
+  if(!Number.isFinite(pitch)) pitch=20;
+  /* pad size on screen follows the pitch and the body size */
+  const round=conn&&c.ps!=='rect';
+  const pw=conn?pitch*.7:Math.max(4,pitch*.55);
+  const pl=conn?pitch*1.1:Math.max(6,Math.min(pitch*1.5,(Number.isFinite(depth)?depth:pitch*6)*.28));
+  const rr=Math.max(5,Math.min(22,pitch*.42)), half=round?rr:pl/2;
+  if(!conn&&Number.isFinite(depth)&&U[0]){   /* body: inner edges of the pad rows */
+    const u0=U[0], v0=N[0], S=P.map(q=>dot(sub(q,C),u0)), T=P.map(q=>dot(sub(q,C),v0));
+    const s0=Math.min(...S), s1=Math.max(...S), t0=Math.min(...T)+pl/2, t1=Math.max(...T)-pl/2;
+    const [a0,a1]=c.pat==='q4'?[s0+pl/2,s1-pl/2]:[s0-pitch*.6,s1+pitch*.6];
+    const at=(x,y)=>(C.x+u0.x*x+v0.x*y)+','+(C.y+u0.y*x+v0.y*y);
+    marks.appendChild(svg('polygon',{points:[at(a0,t0),at(a1,t0),at(a1,t1),at(a0,t1)].join(' '),fill:'rgba(10,14,12,.16)',
+      stroke:isSel?'#fff':col,'stroke-width':isSel?1.8:1.2,...(isSel?{'stroke-dasharray':'5 3'}:{})}));
+  }
+  if(isSel&&!conn) P.forEach(q=>marks.appendChild(svg('line',{x1:b.p.x,y1:b.p.y,x2:q.x,y2:q.y,stroke:'#fff',
+    'stroke-width':1,opacity:.5})));                      /* leads to the body box — only while selected */
+  const room=conn?220:(Number.isFinite(depth)?depth/2-pl/2-6:120);
+  c.pads.forEach((pd,i)=>{ const q=P[i], u=U[i], nv=N[i], nc=pd.net&&nets.find(x=>x.id===pd.net), hot=nc&&hlNet===nc.id;
+    const st=nc?nc.color:(isSel?'#fff':col), sw=hot?2.4:(isSel?1.8:1.3), f1=i===0?'rgba(255,255,255,.22)':'none';   /* pin 1 tinted */
+    let pe;
+    if(round) pe=svg('circle',{cx:q.x,cy:q.y,r:rr,fill:f1,stroke:st,'stroke-width':sw});
+    else{ const cn=[[1,1],[1,-1],[-1,-1],[-1,1]].map(([a,e])=>(q.x+u.x*pw/2*a+nv.x*pl/2*e)+','+(q.y+u.y*pw/2*a+nv.y*pl/2*e));
+      pe=svg('polygon',{points:cn.join(' '),fill:f1,stroke:st,'stroke-width':sw}); }
+    if(hot) pe.setAttribute('data-hot',''); marks.appendChild(pe);
+    if(nc&&nc.name){ const fs=Math.min(10,pitch*.7,room/(nc.name.length*.62));
+      if(fs>=4.5) dirText({x:q.x+nv.x*(half+3),y:q.y+nv.y*(half+3)},nv,nc.name,fs,nc.color,haloFor(nc.color),hot); }
+    if(pitch>13||isSel){ const o=half+7;
+      const t=svg('text',{x:q.x-nv.x*o,y:q.y-nv.y*o,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
         'font-size':9.5,'font-weight':600,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'});
       t.textContent=String(pinNo(c,i)); marks.appendChild(t); } });
   marks.appendChild(svg('rect',{x:b.p.x-b.w/2,y:b.p.y-b.h/2,width:b.w,height:b.h,rx:3,fill:'rgba(10,14,12,.78)',
@@ -1611,7 +1657,14 @@ function renderPropsComp(){
     if(c.pat==='l1'){ const sp=document.createElement('input'); sp.type='text'; sp.className='num'; sp.value=pinNo(c,0);
       sp.title=L('номер первого вывода','first pin number');
       sp.onchange=()=>{ const v=parseInt(sp.value,10); c.pin0=Number.isFinite(v)?v:1; renderProps(); drawMarks(); save(); };
-      mkRow('start pin',sp); }
+      mkRow('start pin',sp);
+      const opt=(pairs,v,on)=>{ const x=document.createElement('select'); x.className='slim';
+        pairs.forEach(([k,t])=>{ const o=document.createElement('option'); o.value=k; o.textContent=t; x.appendChild(o); });
+        x.value=v; x.onchange=()=>{ on(x.value); drawMarks(); save(); }; return x; };
+      mkRow(L('пады','pads'),opt([['round',L('круглые','round')],['rect',L('прямоугольные','rectangular')]],c.ps||'round',v=>c.ps=v));
+      const ls=opt([['r',L('справа','right')],['l',L('слева','left')]],c.ls||'r',v=>c.ls=v);
+      ls.title=L('сторона подписей NET от ряда; у горизонтального ряда «справа» = снизу','NET label side of the row; for a horizontal row “right” = below');
+      mkRow(L('подписи','labels'),ls); }
     const sd=document.createElement('select'); sd.className='slim';
     [['top','top-comp'],['bot','bot-comp']].forEach(([v,t])=>{const o=document.createElement('option'); o.value=v;o.textContent=t;sd.appendChild(o)});
     sd.value=c.side; sd.onchange=()=>{c.side=sd.value;renderComps();drawMarks();save()}; mkRow(L('сторона','side'),sd);
