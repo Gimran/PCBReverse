@@ -1303,7 +1303,8 @@ function drawIC(c,col,isSel){
       pe=svg('polygon',{points:cn.join(' '),fill:f1,stroke:st,'stroke-width':sw}); }
     if(hot){ pe.setAttribute('data-hot',''); pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity','.6'); }   /* focused NET: filled pads */
     marks.appendChild(pe);
-    if(nc&&nc.name){ const fs=conn?(c.fs||12):Math.min(10,pitch*.7,room/(nc.name.length*.62));   /* connector: free space beside the row, font from PROP */
+    if(nc&&nc.name){ const fd=Math.min(40,(round?2*rr:pw)*.6);   /* default label height: 60% of the pad width */
+      const fs=conn?(c.fs||fd):Math.min(fd,room/(nc.name.length*.62));   /* connector: free space beside the row, font from PROP */
       if(fs>=4.5) dirText({x:q.x+nv.x*(half+3),y:q.y+nv.y*(half+3)},nv,nc.name,fs,nc.color,haloFor(nc.color),hot); }
     if(pitch>13||isSel){ const o=half+7;
       const t=svg('text',{x:q.x-nv.x*o,y:q.y-nv.y*o,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
@@ -1753,9 +1754,10 @@ function renderPropsComp(){
       const ls=opt([['r',L('справа','right')],['l',L('слева','left')]],c.ls||'r',v=>c.ls=v);
       ls.title=L('сторона подписей NET от ряда; у горизонтального ряда «справа» = снизу','NET label side of the row; for a horizontal row “right” = below');
       mkRow(L('подписи','labels'),ls);
-      const fz=document.createElement('input'); fz.type='text'; fz.className='num'; fz.value=c.fs||12;
-      fz.title=L('размер шрифта подписей NET, px экрана','NET label font size, screen px');
-      fz.onchange=()=>{ const v=parseFloat(fz.value); c.fs=Number.isFinite(v)?Math.max(5,Math.min(40,v)):12; fz.value=c.fs; drawMarks(); save(); };
+      const fz=document.createElement('input'); fz.type='text'; fz.className='num'; fz.value=c.fs||''; fz.placeholder=L('авто','auto');
+      fz.title=L('размер шрифта подписей NET, px экрана; пусто — 60% ширины пада','NET label font size, screen px; empty — 60% of the pad width');
+      fz.onchange=()=>{ const v=parseFloat(fz.value); if(Number.isFinite(v)) c.fs=Math.max(5,Math.min(40,v)); else delete c.fs;
+        fz.value=c.fs||''; drawMarks(); save(); };
       mkRow(L('шрифт','font'),fz); }
     const sd=document.createElement('select'); sd.className='slim';
     [['top','top-comp'],['bot','bot-comp']].forEach(([v,t])=>{const o=document.createElement('option'); o.value=v;o.textContent=t;sd.appendChild(o)});
