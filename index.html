@@ -142,6 +142,14 @@ button.wide{width:100%}
 .lsep .gline{flex:1;border-top:1px solid var(--line)}
 .lsep input[type=range]{flex:0 0 110px;width:110px;margin:0}
 .lsep .gv{flex:0 0 32px;text-align:right;letter-spacing:0}
+.xbox{display:flex;align-items:center;gap:1px;border:1px solid var(--line);border-radius:4px;background:var(--panel-2);
+  box-shadow:var(--shadow);font-family:"IBM Plex Mono",monospace;font-size:11px;padding-right:3px;min-width:0}
+.xbox button{border:0;box-shadow:none;background:transparent;flex:1;min-width:0;padding:5px 1px}
+.xbox input{width:22px;flex:none;padding:1px 1px;font:inherit;text-align:right;border:1px solid var(--line);
+  border-radius:3px;background:var(--panel);color:var(--text)}
+.xbox.on{background:var(--text);border-color:var(--text);color:var(--panel)}
+.xbox.on button{color:var(--panel)}
+#stack.gray{filter:grayscale(1)}
 .lhead{display:flex;align-items:center;gap:5px;padding:5px 6px 4px;cursor:pointer}
 .layer{cursor:pointer}
 .lhead .lname{flex:1;min-width:0;padding:2px 3px;font-size:13px}
@@ -470,7 +478,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini on" data-vm="all" title="все включённые слои текущей стороны платы">сторона</button>
             <button class="mini" data-vm="solo" title="только активный слой">актив</button>
             <button class="mini" data-vm="swipe">шторка</button>
-            <button class="mini" id="xrayBtn" title="рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы (поверх любого режима)">XRAY</button>
+            <div class="xbox" id="xrayBox"><button class="mini" id="xrayBtn" title="рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы (поверх любого режима)">XRAY</button><input type="text" id="xrayOp" value="50" title="прозрачность стороны в просмотре при XRAY, %; другая сторона — 100%">%</div>
           </div>
           <div class="row"><span class="lbl" style="flex:none">Опора</span>
             <select id="refSel" class="slim"></select></div>
@@ -594,6 +602,7 @@ const I18N={
   'новый слой на текущей стороне платы; сразу выбрать картинку':'new layer on the current board side; pick an image right away',
   '+ Добавить слой':'+ Add layer','Режим просмотра':'View mode','все включённые слои текущей стороны платы':'all enabled layers of the current board side',
   'только активный слой':'active layer only','актив':'active','шторка':'swipe',
+  'прозрачность стороны в просмотре при XRAY, %; другая сторона — 100%':'opacity of the side in view under XRAY, %; the other side — 100%',
   'рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы (поверх любого режима)':
     'X-ray: show layers and components of both sides regardless of board flip (on top of any mode)',
   'Опора':'Ref','настройки активного слоя':'active layer settings','отразить по горизонтали':'mirror horizontally','отразить по вертикали':'mirror vertically',
@@ -648,7 +657,7 @@ let icPat='d2', icPins=8;   /* IC / connector placement: pattern and pin count *
 let compEditShown=false; /* comp panel rendered for edit mode */
 let compVal={R:'',C:''}; /* last typed value per kind — default for new parts */
 let showSide={top:true,bot:true};
-let sideOp={top:1,bot:1};   /* group opacity of the TOP / BOT layers, multiplies each layer's α */
+let sideOp={top:1,bot:1}, xrayOp=.5;   /* xrayOp: side in view under XRAY; the far side stays opaque */   /* group opacity of the TOP / BOT layers, multiplies each layer's α */
 let calib=null;   /* {size,x,y} while calibrating */
 let browseTarget=null, booted=false, projName='project';
 const imgDir='pcb_overlay_img/';   /* fixed: layer pictures by path live next to index.html in this folder */
@@ -914,6 +923,9 @@ function layerShown(l){
   return true;
 }
 function effOpacity(l){ return layerShown(l)? l.op*(sideOp[l.side]??1) : 0; }
+function xraySideOp(){   /* XRAY: side in view translucent (xrayOp), the far side opaque; off — both 100% */
+  const o=boardSide==='top'?'bot':'top';
+  sideOp[boardSide]=xray?xrayOp:1; sideOp[o]=1; }
 function applySideOp(sd){ layers.forEach(l=>{ if(l.side!==sd) return;   /* opacity only: cheap while the slider moves */
   const o=effOpacity(l); l.box.style.setProperty('--op',o); l.box.style.opacity=o; }); save(); }
 function applyTint(l){
@@ -1032,13 +1044,28 @@ function drawMarks(){
       'font-family':'IBM Plex Mono, monospace',opacity:.55}); n.textContent=String(i+1); marks.appendChild(n);
   });
   if(pending&&sel_()) cross(screenOf(worldOf(sel_(),pending)),6,.8);   /* pending = point on the active layer */
+  const fNet=hlNet!==null&&nets.find(n=>n.id===hlNet&&n.on);   /* NET focus: the rest goes grey */
+  $('stack').classList.toggle('gray',!!(fNet&&showNets));
+  const grey=n0=>{ for(let i=n0;i<marks.children.length;i++){ const e=marks.children[i];
+    if(!e.hasAttribute('data-hot')) e.style.filter='grayscale(1)'; } };
+  if(showNets&&fNet){   /* star: from the selected point (else the one nearest the centre) to every other point */
+    const P=points.filter(pt=>pt.net===fNet.id&&byId(pt.layer)).map(pt=>({pt,q:screenOf(worldOf(byId(pt.layer),pt.p))}));
+    let c=P.find(o=>o.pt.id===selPoint);
+    if(!c&&P.length){ const mx=P.reduce((a,o)=>a+o.q.x,0)/P.length, my=P.reduce((a,o)=>a+o.q.y,0)/P.length;
+      c=P.reduce((b,o)=>Math.hypot(o.q.x-mx,o.q.y-my)<Math.hypot(b.q.x-mx,b.q.y-my)?o:b); }
+    if(c) P.forEach(o=>{ if(o===c) return;
+      marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:haloFor(fNet.color),'stroke-width':3.5,opacity:.45}));
+      marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:fNet.color,'stroke-width':1.5,opacity:.9})); });
+  }
   if(showNets) points.forEach(pt=>{
     const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
-    if(!net||!net.on||!lay||!ptShown(pt,lay)) return;
-    const p=screenOf(worldOf(lay,pt.p));
+    if(!net||!net.on||!lay) return;
+    const far=!ptShown(pt,lay); if(far&&net!==fNet) return;   /* the focused NET shows on the far side too */
+    const p=screenOf(worldOf(lay,pt.p)), n0=marks.children.length;
     const hot=hlNet===null||hlNet===net.id, op=hot?1:.28;
     if(pt.via) ring(p,net.color,hot&&hlNet!==null?6.5:5,hot&&hlNet!==null?4:3.2,op); /* via: thick annular pad */
     else ring(p,net.color,hot&&hlNet!==null?9:6,hot&&hlNet!==null?2.2:1.5,op);
+    if(far) marks.lastChild.setAttribute('stroke-dasharray','3 2');   /* far-side point: dashed ring */
     dot(p,net.color,op);
     if(pt.id===selPoint) ring(p,cssVar('--text')||'#fff',12,1,.9);
     if(hlNet!==null&&hlNet===net.id){
@@ -1046,8 +1073,9 @@ function drawMarks(){
       marks.appendChild(svg('line',{x1:p.x+7,y1:p.y,x2:p.x+13,y2:p.y,stroke:net.color,'stroke-width':1.4}));
     }
     if(labels) txt(p,net.color,net.name,op);
+    if(fNet&&!hot) grey(n0);
   });
-  drawComps();
+  { const n0=marks.children.length; drawComps(); if(fNet) grey(n0); }
   drawNotes();
   if(clickMode==='move') drawLayerBox();
   if(clickMode==='crop') drawCropBox();
@@ -1183,8 +1211,9 @@ function drawIC(c,col,isSel){
     'stroke-width':isSel?1.2:.9,opacity:isSel?.85:.55})));                      /* elastic leads */
   c.pads.forEach((pd,i)=>{ const q=P[i], nc=pd.net&&nets.find(n=>n.id===pd.net), hot=nc&&hlNet===nc.id;
     const fill=nc?nc.color:'rgba(210,210,210,.7)', st=hot?nc.color:(isSel?'#fff':col), sw=hot?2.4:(isSel?1.6:1.2);
-    marks.appendChild(i===0 ? svg('rect',{x:q.x-5,y:q.y-5,width:10,height:10,fill,stroke:st,'stroke-width':sw})   /* pin 1 square */
+    const pe=marks.appendChild(i===0 ? svg('rect',{x:q.x-5,y:q.y-5,width:10,height:10,fill,stroke:st,'stroke-width':sw})   /* pin 1 square */
                             : svg('circle',{cx:q.x,cy:q.y,r:5,fill,stroke:st,'stroke-width':sw}));
+    if(hot) pe.setAttribute('data-hot','');
     if(pitch>13||isSel){ const dx=q.x-b.p.x, dy=q.y-b.p.y, d=Math.hypot(dx,dy)||1;
       const t=svg('text',{x:q.x+dx/d*11,y:q.y+dy/d*11,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
         'font-size':9.5,'font-weight':600,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'});
@@ -1385,7 +1414,7 @@ function drawComps(){
     const n=svg('polygon',{points:pts.map(p=>{const q=screenOf(p);return q.x+','+q.y}).join(' '),
       fill:fill,stroke:stroke,'stroke-width':wd,opacity:op});
     if(dash)n.setAttribute('stroke-dasharray',dash);
-    marks.appendChild(n); };
+    return marks.appendChild(n); };
   if(drag&&drag.t==='icrect'&&drag.moved){ /* placement rubber band (rotated axes) + pad preview */
     const f=icFrame(drag.sx,drag.sy,drag.ex,drag.ey);
     marks.appendChild(svg('polygon',{points:f.corners.map(q=>q.x+','+q.y).join(' '),fill:'none',stroke:'#e8b04b','stroke-width':1.2,'stroke-dasharray':'5 4'}));
@@ -1418,8 +1447,9 @@ function drawComps(){
     [['p1',c.n1],['p2',c.n2]].forEach(([k,net])=>{
       const nc=net&&nets.find(n=>n.id===net);
       const hot=nc&&hlNet===nc.id;
-      poly(g[k], nc?nc.color:'rgba(210,210,210,.55)', hot?nc.color:(isSel?'#fff':col),
+      const pe=poly(g[k], nc?nc.color:'rgba(210,210,210,.55)', hot?nc.color:(isSel?'#fff':col),
            hot?2.4:(isSel?1.6:1), null, hot?1:.85);
+      if(hot) pe.setAttribute('data-hot','');
     });
     /* pin numbers — centred on pads, skipped when the part is too small on screen */
     [['p1','1'],['p2','2']].forEach(([k,num])=>{
@@ -1989,7 +2019,8 @@ function sync(){
   $('gridBtn').classList.toggle('on',grid); vp.classList.toggle('nogrid',!grid);
   $('invBtn').classList.toggle('on',inverted);
   $('flipBoard').textContent=L('Плата: ','Board: ')+(boardSide==='top'?'TOP':'BOT')+L(' · перевернуть (F)',' · flip (F)');
-  $('xrayBtn').classList.toggle('on',xray);
+  $('xrayBtn').classList.toggle('on',xray); $('xrayBox').classList.toggle('on',xray);
+  if(document.activeElement!==$('xrayOp')) $('xrayOp').value=Math.round(xrayOp*100);
   syncActl();
   { const l=sel_(); ['keyOn','keyCol','keyPick','keyTol'].forEach(i=>$(i).disabled=!l);
     if(l){ $('keyOn').classList.toggle('on',!!l.kOn); $('keyCol').value=l.kc;
@@ -2015,7 +2046,7 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, icPin0, compVal, sideCol:SIDECOL, sideOp, showSide, showNets, showComps, notes, showDraw, drawStyle, warpModel, imgDir, projName};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, icPin0, compVal, sideCol:SIDECOL, sideOp, xrayOp, showSide, showNets, showComps, notes, showDraw, drawStyle, warpModel, imgDir, projName};
 }
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
@@ -2053,6 +2084,7 @@ function restore(s){
   compVal=Object.assign({R:'',C:''},s.compVal||{});
   SIDECOL=Object.assign({...SIDECOL_DEF},s.sideCol||{});
   sideOp=Object.assign({top:1,bot:1},s.sideOp||{});
+  xrayOp=typeof s.xrayOp==='number'?s.xrayOp:.5;
   showNets=s.showNets!==false; showComps=s.showComps!==false;
   notes=Array.isArray(s.notes)?s.notes:[]; showDraw=s.showDraw!==false; selNote=null;
   drawStyle=Object.assign({col:'#ffd400',w:2,fs:16},s.drawStyle||{});
@@ -2558,6 +2590,7 @@ function flipBoard(){
   view.fh=!view.fh;
   { const s2=screenOf(aw); view.x+=as.x-s2.x; view.y+=as.y-s2.y; }
   if(!xray){ showSide.top = boardSide==='top'; showSide.bot = boardSide==='bot'; }
+  else xraySideOp();
   const vis=layers.filter(onSide);
   if(vis.length && !vis.some(l=>l.on)) { /* nothing visible on this side — leave as is */ }
   if(!byId(sel)||effOpacity(byId(sel))===0){ const c=vis.find(l=>l.on); if(c)sel=c.id; }
@@ -2566,12 +2599,17 @@ function flipBoard(){
 }
 $('flipBoard').onclick=flipBoard;
 $('xrayBtn').onclick=()=>{
-  xray=!xray;
+  xray=!xray; xraySideOp();
   if(xray){ showSide.top=showSide.bot=true; }
   else { showSide.top=boardSide==='top'; showSide.bot=boardSide==='bot';
     if(!byId(sel)||effOpacity(byId(sel))===0){ const c=layers.find(l=>l.on&&onSide(l)); if(c)sel=c.id; } }
   applyAll(); renderCards(); renderComps(); drawMarks(); sync(); save();
 };
+$('xrayOp').oninput=()=>{ const v=parseFloat($('xrayOp').value); if(!Number.isFinite(v)) return;
+  xrayOp=Math.max(0,Math.min(100,v))/100; if(!xray) return;
+  xraySideOp(); applySideOp(boardSide); renderCards(); };
+$('xrayOp').onchange=()=>{ $('xrayOp').value=Math.round(xrayOp*100); };
+$('xrayOp').onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape') $('xrayOp').blur(); };
 $('rstView').onclick=()=>fit();
 function rotateView(d){ view.rot=(((view.rot+d)%360)+360)%360; applyView(); sync(); }
 $('vrotL').onclick=()=>rotateView(-90);
