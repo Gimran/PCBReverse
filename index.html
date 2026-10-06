@@ -1072,7 +1072,7 @@ function drawMarks(){
     if(!net||!net.on||!lay) return;
     const far=!ptShown(pt,lay); if(far&&net!==fNet) return;   /* the focused NET shows on the far side too */
     const pw=worldOf(lay,pt.p), p=screenOf(pw), n0=marks.children.length;
-    if(pt.id!==selPoint&&cov.some(o=>o.net===net.id&&o.has(pw,p))) return;   /* the pad already shows this NET */
+    if(pt.id!==selPoint&&cov.some(o=>o.net===net.id&&(o.has(pw,p)||o.zone(pw,p)))) return;   /* the pad already shows this NET */
     const hot=hlNet===null||hlNet===net.id, op=hot?1:.28;
     if(pt.via) ring(p,net.color,hot&&hlNet!==null?6.5:5,hot&&hlNet!==null?4:3.2,op); /* via: thick annular pad */
     else ring(p,net.color,hot&&hlNet!==null?9:6,hot&&hlNet!==null?2.2:1.5,op);
@@ -1317,24 +1317,26 @@ function drawIC(c,col,isSel){
     'font-family':'IBM Plex Mono, monospace',stroke:'rgba(0,0,0,.7)','stroke-width':3,'paint-order':'stroke'});
     v.textContent=c.val; marks.appendChild(v); }
 }
-/* pads of visible parts that carry a NET: [{net, has(w,q)}] (w world, q screen) — a NET point inside such a pad
-   of the same NET is not drawn, the pad already shows the name */
+/* pads of visible parts that carry a NET: [{c, net, has(w,q), zone(w,q)}] (w world, q screen). has — inside the drawn
+   pad (a click there highlights the NET); zone — the pin's binding zone too: a NET point of the same NET there is not
+   drawn, the pad already shows the name */
 function padCover(){
   const out=[]; if(!showComps) return out;
   comps.forEach(c=>{ if(!showSide[c.side]) return;
     if(isSOT(c)){ const k=mmScale||1, a=-(c.rot||0)*Math.PI/180;
-      c.pads.forEach(pd=>{ if(pd.net) out.push({net:pd.net,has:w=>{ const v=rotV({x:w.x-pd.x,y:w.y-pd.y},a);
-        return Math.abs(v.x)<=SOT23.pw/2*k&&Math.abs(v.y)<=SOT23.ph/2*k; }}); });
+      c.pads.forEach(pd=>{ if(pd.net) out.push({c,net:pd.net,has:w=>{ const v=rotV({x:w.x-pd.x,y:w.y-pd.y},a);
+        return Math.abs(v.x)<=SOT23.pw/2*k&&Math.abs(v.y)<=SOT23.ph/2*k; },zone:w=>Math.hypot(w.x-pd.x,w.y-pd.y)<icPadR(c)}); });
       return; }
-    if(isIC(c)){ const G=icGeom(c);
+    if(isIC(c)){ const G=icGeom(c), R=icPadR(c);
       c.pads.forEach((pd,i)=>{ if(!pd.net) return; const q0=G.P[i], u=G.U[i], nv=G.N[i];
-        out.push({net:pd.net,has:(w,q)=>{ const d={x:q.x-q0.x,y:q.y-q0.y};
+        out.push({c,net:pd.net,zone:w=>Math.hypot(w.x-pd.x,w.y-pd.y)<R,has:(w,q)=>{ const d={x:q.x-q0.x,y:q.y-q0.y};
           return G.round?Math.hypot(d.x,d.y)<=G.rr:Math.abs(G.dot(d,u))<=G.pw/2&&Math.abs(G.dot(d,nv))<=G.pl/2; }}); });
       return; }
     const g=PKG[c.size]; if(!g) return; const k=mmScale||1, hl=g.L/2*k, hw=g.W/2*k, t=g.T*k, a=-(c.rot||0)*Math.PI/180;
     [['n1',-1],['n2',1]].forEach(([key,sg])=>{ const net=c[key]; if(!net) return;
-      out.push({net,has:w=>{ const v=rotV({x:w.x-c.x,y:w.y-c.y},a), u=v.x*sg;
-        return u>=hl-t&&u<=hl&&Math.abs(v.y)<=hw; }}); });
+      out.push({c,net,has:w=>{ const v=rotV({x:w.x-c.x,y:w.y-c.y},a), u=v.x*sg;
+        return u>=hl-t&&u<=hl&&Math.abs(v.y)<=hw; },zone:w=>{   /* binding zone plus a bit: display only */
+        const v=rotV({x:w.x-c.x,y:w.y-c.y},a), u=v.x*sg; return u>=0&&u<=hl+g.L*k*.3&&Math.abs(v.y)<=hw+g.W*k*.4; }}); });
   });
   return out;
 }
@@ -2679,7 +2681,10 @@ vp.addEventListener('pointerup',e=>{
     drawMarks(); syncComps(); return;
   }
   if(clickMode==='none'){
-    const hit=hitPoint(m), hc=!hit&&hitComp(m);
+    const hit=hitPoint(m);
+    if(!hit){ const q=screenOf(m), pc=padCover().find(o=>o.has(m,q));   /* a pad with a NET is a NET point too */
+      if(pc){ hlNet=activeNet=pc.net; selPoint=null; selComp=pc.c.id; renderNets(); renderComps(); drawMarks(); syncComps(); sync(); return; } }
+    const hc=!hit&&hitComp(m);
     if(!hit&&(hlNet||selPoint)){ hlNet=null; selPoint=null; renderNets(); sync(); }   /* click off a NET point clears it */
     if(hc){ selComp=hc.id; renderComps(); drawMarks(); syncComps(); return; }
     if(!hit&&selComp){ selComp=null; renderComps(); drawMarks(); syncComps(); sync(); }   /* empty spot: deselect the part too */
