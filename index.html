@@ -371,7 +371,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>Alt+клик</b> в режиме N — переходное отверстие (точка на обеих сторонах)<br>
             <b>Ctrl+клик</b> в режиме N — новый NET с первой точкой-via (сквозной), сразу ввод имени<br>
             <b>Alt+A</b> — выделенный NET объединить с другим: клик по его точке или строке в списке (Esc — отмена)<br>
-            <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> / <b>Delete</b> — удалить (только в режимах N / K) · <b>Esc</b> — выход
+            <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>Delete</b> — удалить выделенное (точку, компонент, рисунок) · <b>Esc</b> — выход
           </div>
           <div class="keys" data-only="en">
             Images given by path are looked up in <b>pcb_overlay_img/</b> next to index.html;<br>
@@ -384,7 +384,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>Alt+click</b> in N mode — via (point on both sides)<br>
             <b>Ctrl+click</b> in N mode — new NET whose first point is a via, then type its name<br>
             <b>Alt+A</b> — merge the highlighted NET into another: click its point or its row in the list (Esc — cancel)<br>
-            <b>Space</b> / <b>Shift+Space</b> — rotate component 45°<br><b>right-click</b> / <b>Delete</b> — delete (N / K modes only) · <b>Esc</b> — exit mode
+            <b>Space</b> / <b>Shift+Space</b> — rotate component 45°<br><b>Delete</b> — delete the selection (point, component, drawing) · <b>Esc</b> — exit mode
           </div>
         </div>
       </div>
@@ -1465,8 +1465,8 @@ function syncDraw(){
   $('showDrawBtn').classList.toggle('on',showDraw);
   $('drawStatus').innerHTML = clickMode!=='draw'
     ? L('Включите «Рисование (D)» или выберите инструмент.','Turn on “Drawing (D)” or pick a tool.')
-    : ({sel:L('Клик — выбрать фигуру, тянуть — двигать, белые маркеры — менять форму. Delete / правый клик — удалить.',
-              'Click — pick a shape, drag — move, white handles — reshape. Delete / right-click — delete.'),
+    : ({sel:L('Клик — выбрать фигуру, тянуть — двигать, белые маркеры — менять форму. Delete — удалить выделенную.',
+              'Click — pick a shape, drag — move, white handles — reshape. Delete — delete the selected one.'),
         text:L('Клик — поставить надпись; текст правится во вкладке PROP.','Click — place a label; edit its text in the PROP tab.'),
         arrow:L('Тяните от начала к острию.','Drag from the tail to the tip.'),
         rect:L('Тяните по диагонали.','Drag along the diagonal.'),
@@ -1482,9 +1482,6 @@ function propRow(box,label,node){ const r=document.createElement('div'); r.class
 function mkSelect(opts,val,fn){ const x=document.createElement('select'); x.className='slim';
   opts.forEach(([v,t])=>{ const o=document.createElement('option'); o.value=v; o.textContent=t; x.appendChild(o); });
   x.value=val; x.onchange=()=>fn(x.value); return x; }
-function lockBox(box,mode,tip){ if(clickMode===mode) return;
-  box.querySelectorAll('input,select,button:not(.free)').forEach(n=>n.disabled=true);
-  const h=document.createElement('div'); h.className='empty'; h.textContent=tip; box.appendChild(h); }
 function netPins(netId){ /* component pins on a NET: [{c,label}] */
   const out=[];
   comps.forEach(c=>{ if(isIC(c)) c.pads.forEach((pd,i)=>{ if(pd.net===netId) out.push({c,label:c.des+'.'+pinNo(c,i)}); });
@@ -1503,7 +1500,6 @@ function renderPointProps(pt){
   const del=document.createElement('button'); del.className='mini wide'; del.textContent=L('Удалить точку','Delete point');
   del.onclick=()=>{ points=points.filter(p=>p.id!==pt.id); selPoint=null; renderNets(); renderProp(); drawMarks(); sync(); save(); };
   box.appendChild(del);
-  lockBox(box,'net',L('Правка — в режиме «Редактирование NET» (N).','Editing — in “Edit NETs” mode (N).'));
 }
 function renderNetProps(net){
   const box=$('netProps'); box.innerHTML=''; if(!net) return;
@@ -1543,7 +1539,6 @@ function renderNoteProps(n){
   propRow(box,L('сторона','side'),mkSelect([['any',L('обе','both')],['top','TOP'],['bot','BOT']],n.side||'any',v=>{ n.side=v; drawMarks(); save(); }));
   const del=document.createElement('button'); del.className='mini wide'; del.textContent=L('Удалить','Delete'); del.onclick=()=>delNote(n.id);
   box.appendChild(del);
-  lockBox(box,'draw',L('Правка — в режиме «Рисование» (D).','Editing — in “Drawing” mode (D).'));
 }
 let propKey='';
 function renderProp(){
@@ -1718,7 +1713,6 @@ function renderComps(){
     const v=document.createElement('span'); v.className='v'; v.textContent=c.val||'—';
     const sz=document.createElement('span'); sz.className='s'; sz.textContent=c.size;
     const x=document.createElement('button'); x.className='x'; x.textContent='✕';
-    x.disabled=clickMode!=='comp';
     x.onclick=e=>{e.stopPropagation(); comps=comps.filter(o=>o.id!==c.id);
       if(selComp===c.id)selComp=null; renderComps();drawMarks();save()};
     row.onclick=()=>{selComp=c.id;renderComps();drawMarks();sync()};
@@ -1776,9 +1770,6 @@ function renderPropsComp(){
     const del=document.createElement('button'); del.className='mini wide'; del.textContent=L('Удалить компонент','Delete component');
     del.onclick=()=>{comps=comps.filter(o=>o.id!==c.id);selComp=null;renderComps();drawMarks();save()};
     box.appendChild(del);
-    if(clickMode!=='comp'){ box.querySelectorAll('input,select,button').forEach(n=>n.disabled=true);
-      const h=document.createElement('div'); h.className='empty';
-      h.textContent=L('Правка — в режиме «Редактирование компонентов» (K).','Editing — in “Edit components” mode (K).'); box.appendChild(h); }
     return;
   }
   const sz=document.createElement('select'); sz.className='slim';
@@ -1808,10 +1799,6 @@ function renderPropsComp(){
   const del=document.createElement('button'); del.className='mini wide'; del.textContent=L('Удалить компонент','Delete component');
   del.onclick=()=>{comps=comps.filter(o=>o.id!==c.id);selComp=null;renderComps();drawMarks();save()};
   box.appendChild(del);
-  if(clickMode!=='comp'){ /* view only outside the edit mode */
-    box.querySelectorAll('input,select,button').forEach(n=>n.disabled=true);
-    const h=document.createElement('div'); h.className='empty';
-    h.textContent=L('Правка — в режиме «Редактирование компонентов» (K).','Editing — in “Edit components” mode (K).'); box.appendChild(h); }
 }
 function renderComps0(){ /* list refresh without rebuilding props (keeps focus) */
   const box=$('complist');
@@ -2101,6 +2088,17 @@ function mergeNets(from,to){
     activeNet=hlNet=to; save(); }
   renderNets(); renderProps(); drawMarks(); sync();
 }
+/* Delete: whatever is selected, any mode; the mode decides when several are selected */
+function delSelected(){
+  const delPt=()=>{ points=points.filter(p=>p.id!==selPoint); selPoint=null; renderNets(); drawMarks(); sync(); save(); };
+  const delC=()=>{ comps=comps.filter(o=>o.id!==selComp); selComp=null; renderComps(); drawMarks(); sync(); save(); };
+  if(clickMode==='draw'&&selNote) return delNote(selNote);
+  if(clickMode==='net'&&selPoint) return delPt();
+  if(clickMode==='comp'&&selComp) return delC();
+  if(selPoint) return delPt();
+  if(selComp) return delC();
+  if(selNote) delNote(selNote);
+}
 function hitPoint(m){
   let best=null,bd=12/Math.abs(view.z);
   if(showNets) points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
@@ -2187,8 +2185,8 @@ function sync(){
     : L(`Активный NET: <b>${an.name}</b> · точек ${points.filter(p=>p.net===activeNet).length}<br>`,
         `Active NET: <b>${an.name}</b> · points ${points.filter(p=>p.net===activeNet).length}<br>`)+
       L(`Точки ставятся на слой <b>${s?s.name:'—'}</b>.`,`Points go to layer <b>${s?s.name:'—'}</b>.`)+
-      (netting?L(' <b>Alt+клик</b> — переходное (видно с обеих сторон). Правый клик / Delete по точке — удалить.',
-                 ' <b>Alt+click</b> — via (visible on both sides). Right-click / Delete on a point — delete.'):'')+
+      (netting?L(' <b>Alt+клик</b> — переходное (видно с обеих сторон). Выделить точку + Delete — удалить.',
+                 ' <b>Alt+click</b> — via (visible on both sides). Select a point + Delete — delete.'):'')+
       (hlNet?`<br><span class="good">${L('подсвечен','highlighted')}: ${nets.find(n=>n.id===hlNet).name}</span>`:'');
 
   const cue=$('hudCue');
@@ -2685,6 +2683,8 @@ vp.addEventListener('pointerup',e=>{
     if(!hit){ const q=screenOf(m), pc=padCover().find(o=>o.has(m,q));   /* a pad with a NET is a NET point too */
       if(pc){ hlNet=activeNet=pc.net; selPoint=null; selComp=pc.c.id; renderNets(); renderComps(); drawMarks(); syncComps(); sync(); return; } }
     const hc=!hit&&hitComp(m);
+    if(hit&&selComp){ selComp=null; renderComps(); }
+    if(hc) selPoint=null;
     if(!hit&&(hlNet||selPoint)){ hlNet=null; selPoint=null; renderNets(); sync(); }   /* click off a NET point clears it */
     if(hc){ selComp=hc.id; renderComps(); drawMarks(); syncComps(); return; }
     if(!hit&&selComp){ selComp=null; renderComps(); drawMarks(); syncComps(); sync(); }   /* empty spot: deselect the part too */
@@ -2718,18 +2718,7 @@ vp.addEventListener('pointerup',e=>{
   if(hit){ hlNet=hit.net; activeNet=hit.net; selPoint=hit.id; renderNets(); sync(); }
   drawMarks();
 });
-vp.addEventListener('contextmenu',e=>{ /* delete only in the matching edit mode */
-  if(clickMode==='comp'||clickMode==='net'||clickMode==='draw') e.preventDefault();
-  if(clickMode==='draw'){ const h=hitNote(e); if(h) delNote(h.n.id); return; }
-  const mm=worldFromEvent(e);
-  const hc=clickMode==='comp'&&hitComp(mm);
-  if(hc){ e.preventDefault(); comps=comps.filter(o=>o.id!==hc.id);
-    if(selComp===hc.id)selComp=null; renderComps(); drawMarks(); save(); return; }
-  const hit=clickMode==='net'&&hitPoint(mm); if(!hit)return;
-  points=points.filter(p=>p.id!==hit.id);
-  if(selPoint===hit.id)selPoint=null;
-  renderNets();drawMarks();sync();save();
-});
+vp.addEventListener('contextmenu',e=>e.preventDefault());   /* no right-click delete: select, then Delete */
 
 document.querySelectorAll('[data-ltab]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('[data-ltab]').forEach(x=>x.classList.toggle('on',x===b));
@@ -2972,11 +2961,7 @@ addEventListener('keydown',e=>{
     case 'p':case 'P':case 'з':case 'З':$('pickBtn').click();return;
     case 'n':case 'N':case 'т':case 'Т':$('netPickBtn').click();return;
     case 'd':case 'D':case 'в':case 'В':$('drawBtn').click();return;
-    case 'Delete':
-      if(clickMode==='comp'&&selComp){comps=comps.filter(o=>o.id!==selComp);selComp=null;renderComps();drawMarks();save();}
-      else if(clickMode==='net'&&selPoint)$('delPoint').click();
-      else if(clickMode==='draw'&&selNote) delNote(selNote);
-      return;
+    case 'Delete': delSelected(); return;
     case 'k':case 'K':case 'л':case 'Л':if(!$('compPick').disabled)$('compPick').click();return;
     case 'm':case 'M':case 'ь':case 'Ь':if(!$('moveBtn').disabled)$('moveBtn').click();return;
     case 'f':case 'F':case 'а':case 'А':flipBoard();return;
