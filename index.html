@@ -380,6 +380,8 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <select id="icPat" class="slim"></select></div>
         <div class="row" id="icPinsRow" hidden><span class="lbl" style="flex:none;width:52px">выводы</span>
           <input type="text" class="num" id="icPins" inputmode="numeric" value="8" title="число выводов"></div>
+        <div class="row" id="icPin0Row" hidden><span class="lbl" style="flex:none;width:52px">start pin</span>
+          <input type="text" class="num" id="icPin0" inputmode="numeric" value="1" title="номер первого вывода разъёма (с него начинается нумерация)"></div>
         <div class="row" id="compSizeRow"><span class="lbl" style="flex:none;width:52px">корпус</span>
           <select id="compSize" class="slim">
             <option>0201</option><option>0402</option><option selected>0603</option><option>0805</option>
@@ -539,7 +541,8 @@ const I18N={
   'Масштаб платы':'Board scale','эталон':'gauge','px/мм':'px/mm','Калибровать':'Calibrate','Готово':'Done',
   'Поставить компонент':'Place component','R · резистор':'R · resistor','C · конденсатор':'C · capacitor','корпус':'package','сторона':'side',
   'U · микросхема / разъём':'U · IC / connector','пады ставятся по прямоугольнику, который растягивается мышью':'pads are placed along a rectangle you drag with the mouse',
-  'паттерн':'pattern','выводы':'pins','число выводов':'number of pins','Поставить':'Place',
+  'паттерн':'pattern','выводы':'pins','число выводов':'number of pins',
+  'номер первого вывода разъёма (с него начинается нумерация)':'number of the first connector pin (numbering starts here)','Поставить':'Place',
   'редактирование компонентов: выбор, перетаскивание, поворот, удаление':'edit components: select, move, rotate, delete','Правка (K)':'Edit (K)',
   'ставить новые компоненты выбранного типа; Esc или повторное нажатие — закончить':'place new components of the chosen type; Esc or press again — finish',
   'Редактирование компонентов (K)':'Edit components (K)','Свойства выбранного':'Selected part','Компонент не выбран.':'No component selected.',
@@ -1082,8 +1085,9 @@ const ICPAT={ q4:[L('4 стороны (QFP / QFN)','4 sides (QFP / QFN)'),'QFP']
   l1:[L('в линию — разъём','in-line — connector'),'1×'] };
 const ICPATNAME=k=>(ICPAT[k]||ICPAT[k==='d2v'||k==='d2h'?'d2':''])?.[0]||'';   /* old saves: d2v / d2h */
 /* placement orientation (screen degrees, CW): rot 0 = pins on left/right (2 sides), pin 1 top-left */
-let icRot=0, placing=false;   /* placing: «Поставить» armed inside the K mode */
+let icRot=0, placing=false, icPin0=1;   /* icPin0: start pin of an in-line connector */   /* placing: «Поставить» armed inside the K mode */
 const isIC=c=>!!c.pads;
+const pinNo=(c,i)=>(Number.isFinite(c.pin0)?c.pin0:1)+i;   /* pin label: start pin + index */
 function icLayout(pat,n,x0,y0,x1,y1){ /* screen rect -> pad screen points, CCW from pin 1 */
   const lerp=(a,b,t)=>a+(b-a)*t, f=(i,k)=>k>1?i/(k-1):.5, out=[];
   if(pat==='l1'){ const hor=x1-x0>=y1-y0;
@@ -1117,7 +1121,8 @@ function addIC(f){ /* placement frame -> new IC with pads on its border */
   const ctr=W(f.toS({x:(f.x0+f.x1)/2,y:(f.y0+f.y1)/2}));
   const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), kind, pat:icPat,
     size:icSizeLabel(icPat,n), side:compSide, x:ctr.x, y:ctr.y, rot:0, des:kind+(compSeq[kind]++),
-    val:compVal[kind]||'', pads:icLayout(icPat,n,f.x0,f.y0,f.x1,f.y1).map(q=>({...W(f.toS(q)),net:null}))};
+    val:compVal[kind]||'', pads:icLayout(icPat,n,f.x0,f.y0,f.x1,f.y1).map(q=>({...W(f.toS(q)),net:null})),
+    ...(icPat==='l1'&&icPin0!==1?{pin0:icPin0}:{})};
   autoPins(c); comps.push(c);
   if(!showSide[c.side]) showSide[c.side]=true;
   selComp=c.id; renderComps(); drawMarks(); save();
@@ -1136,7 +1141,7 @@ function drawIC(c,col,isSel){
     if(pitch>13||isSel){ const dx=q.x-b.p.x, dy=q.y-b.p.y, d=Math.hypot(dx,dy)||1;
       const t=svg('text',{x:q.x+dx/d*11,y:q.y+dy/d*11,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
         'font-size':9.5,'font-weight':600,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'});
-      t.textContent=String(i+1); marks.appendChild(t); } });
+      t.textContent=String(pinNo(c,i)); marks.appendChild(t); } });
   marks.appendChild(svg('rect',{x:b.p.x-b.w/2,y:b.p.y-b.h/2,width:b.w,height:b.h,rx:3,fill:'rgba(10,14,12,.78)',
     stroke:isSel?'#fff':col,'stroke-width':isSel?2:1.3,...(isSel?{'stroke-dasharray':'5 3'}:{})}));
   const t=svg('text',{x:b.p.x,y:b.p.y+.5,fill:isSel?'#fff':col,'font-size':12,'font-weight':600,'text-anchor':'middle',
@@ -1360,11 +1365,15 @@ function renderProps(){
     val.placeholder='SN74AC14';
     const pi=document.createElement('span'); pi.className='val'; pi.style.textAlign='left'; pi.style.flex='1';
     pi.textContent=c.size+' · '+ICPATNAME(c.pat); mkRow(L('корпус','package'),pi);
+    if(c.pat==='l1'){ const sp=document.createElement('input'); sp.type='text'; sp.className='num'; sp.value=pinNo(c,0);
+      sp.title=L('номер первого вывода','first pin number');
+      sp.onchange=()=>{ const v=parseInt(sp.value,10); c.pin0=Number.isFinite(v)?v:1; renderProps(); drawMarks(); save(); };
+      mkRow('start pin',sp); }
     const sd=document.createElement('select'); sd.className='slim';
     [['top','top-comp'],['bot','bot-comp']].forEach(([v,t])=>{const o=document.createElement('option'); o.value=v;o.textContent=t;sd.appendChild(o)});
     sd.value=c.side; sd.onchange=()=>{c.side=sd.value;renderComps();drawMarks();save()}; mkRow(L('сторона','side'),sd);
     const pl=document.createElement('div'); pl.style.cssText='display:grid;grid-template-columns:auto 1fr;gap:3px 6px;max-height:240px;overflow:auto;align-items:center';
-    c.pads.forEach((pd,i)=>{ const n=document.createElement('span'); n.className='lbl'; n.style.textAlign='right'; n.textContent=String(i+1);
+    c.pads.forEach((pd,i)=>{ const n=document.createElement('span'); n.className='lbl'; n.style.textAlign='right'; n.textContent=String(pinNo(c,i));
       const s2=document.createElement('select'); s2.className='slim';
       const o0=document.createElement('option'); o0.value=''; o0.textContent='—'; s2.appendChild(o0);
       nets.forEach(nt=>{const o=document.createElement('option');o.value=nt.id;o.textContent=nt.name;s2.appendChild(o)});
@@ -1440,6 +1449,7 @@ function syncComps(){
   $('kindU').classList.toggle('on',compKind==='U');
   $('icPatRow').hidden=$('icPinsRow').hidden=compKind!=='U'; $('compSizeRow').hidden=compKind==='U';
   $('icPat').value=icPat; if(document.activeElement!==$('icPins')) $('icPins').value=icPins;
+  $('icPin0Row').hidden=compKind!=='U'||icPat!=='l1'; if(document.activeElement!==$('icPin0')) $('icPin0').value=icPin0;
   $('compSize').value=compSize; $('compSide').value=compSide;
   $('compPick').disabled=!mmScale&&compKind!=='U';
   if(clickMode!=='comp') placing=false;
@@ -1796,7 +1806,7 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, icPin0, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
 }
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
@@ -1829,7 +1839,7 @@ function restore(s){
   comps=Array.isArray(s.comps)?s.comps:[]; mmScale=+s.mmScale||0;
   compSeq=s.compSeq||{R:1,C:1}; compKind=s.compKind||'R'; compSize=s.compSize||'0603';
   icPat=ICPAT[s.icPat]?s.icPat:'d2'; icPins=+s.icPins||8;
-  icRot=typeof s.icRot==='number'?s.icRot:(s.icPat==='d2h'?270:0);
+  icRot=typeof s.icRot==='number'?s.icRot:(s.icPat==='d2h'?270:0); icPin0=Number.isFinite(s.icPin0)?s.icPin0:1;
   compSide=s.compSide||'top'; compRot=+s.compRot||0;
   compVal=Object.assign({R:'',C:''},s.compVal||{});
   SIDECOL=Object.assign({...SIDECOL_DEF},s.sideCol||{});
@@ -2355,6 +2365,7 @@ $('kindU').onclick=()=>{compKind='U';syncComps();save()};
 Object.entries(ICPAT).forEach(([k,[t]])=>{ const o=document.createElement('option'); o.value=k; o.textContent=t; $('icPat').appendChild(o); });
 $('icPat').onchange=e=>{icPat=e.target.value;syncComps();save()};
 $('icPins').onchange=e=>{ icPins=Math.max(1,Math.min(400,parseInt(e.target.value,10)||8)); syncComps(); save(); };
+$('icPin0').onchange=e=>{ const v=parseInt(e.target.value,10); icPin0=Number.isFinite(v)?v:1; syncComps(); save(); };
 $('compSize').onchange=e=>{compSize=e.target.value;syncComps();save()};
 $('compSide').onchange=e=>{compSide=e.target.value;syncComps();save()};
 $('compPick').onclick=()=>{ clickMode=clickMode==='comp'?'none':'comp'; placing=false;
