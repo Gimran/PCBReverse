@@ -415,7 +415,9 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <button class="mini on" id="kindR">R · резистор</button>
           <button class="mini" id="kindC">C · конденсатор</button>
         </div>
-        <button class="mini wide" id="kindQ" title="SOT-23: корпус 2.9×1.3 мм, выводы 1–2 с одной стороны (шаг 1.9 мм), 3 — напротив; ставится кликом, Space — поворот">Q · транзистор SOT-23</button>
+        <button class="mini wide" id="kindQ" title="SOT-23 / SC-70: пады ставятся рамкой по крайним выводам, как у микросхемы — размер корпуса любой">Q · транзистор SOT-23</button>
+        <div class="row" id="sotPatRow" hidden><span class="lbl" style="flex:none;width:52px">корпус</span>
+          <select id="sotPat" class="slim"><option value="s3">SOT23-3 / SC70-3</option><option value="s5">SOT23-5 / SC70-5</option><option value="s6">SOT23-6 / SC70-6</option></select></div>
         <button class="mini wide" id="kindU" title="пады ставятся по прямоугольнику, который растягивается мышью">U · микросхема / разъём</button>
         <div class="row" id="icPatRow" hidden><span class="lbl" style="flex:none;width:52px">паттерн</span>
           <select id="icPat" class="slim"></select></div>
@@ -587,8 +589,8 @@ const I18N={
   'Поставить компонент':'Place component','R · резистор':'R · resistor','C · конденсатор':'C · capacitor','корпус':'package','сторона':'side',
   'U · микросхема / разъём':'U · IC / connector','пады ставятся по прямоугольнику, который растягивается мышью':'pads are placed along a rectangle you drag with the mouse',
   'Q · транзистор SOT-23':'Q · transistor SOT-23',
-  'SOT-23: корпус 2.9×1.3 мм, выводы 1–2 с одной стороны (шаг 1.9 мм), 3 — напротив; ставится кликом, Space — поворот':
-    'SOT-23: body 2.9×1.3 mm, pins 1–2 on one side (1.9 mm apart), 3 opposite; placed with a click, Space — rotate',
+  'SOT-23 / SC-70: пады ставятся рамкой по крайним выводам, как у микросхемы — размер корпуса любой':
+    'SOT-23 / SC-70: pads are placed with a frame over the outer pins, like an IC — any body size',
   'паттерн':'pattern','выводы':'pins','число выводов':'number of pins',
   'номер первого вывода разъёма (с него начинается нумерация)':'number of the first connector pin (numbering starts here)','Поставить':'Place',
   'редактирование компонентов: выбор, перетаскивание, поворот, удаление':'edit components: select, move, rotate, delete','Правка (K)':'Edit (K)',
@@ -660,7 +662,7 @@ const SIDECOL_DEF={top:'#ff0000', bot:'#0000ff'};
 let SIDECOL={...SIDECOL_DEF}; /* component colour per side, editable, saved */
 let comps=[], selComp=null, mmScale=0, compSeq={R:1,C:1};
 let compKind='R', compSize='0603', compSide='top', compRot=0;
-let icPat='d2', icPins=8;   /* IC / connector placement: pattern and pin count */
+let icPat='d2', icPins=8, sotPat='s3';   /* sotPat: SOT23-3 / -5 / -6 */   /* IC / connector placement: pattern and pin count */
 let compEditShown=false; /* comp panel rendered for edit mode */
 let compVal={R:'',C:''}; /* last typed value per kind — default for new parts */
 let showSide={top:true,bot:true};
@@ -1171,7 +1173,7 @@ const ICPAT={ q4:[L('4 стороны (QFP / QFN)','4 sides (QFP / QFN)'),'QFP']
 /* SOT-23 (TO-236): body L×W, pad centres (local mm, pin 1, 2, 3), land pad size */
 const SOT23={L:2.9,W:1.3,pads:[{x:-.95,y:1.0},{x:.95,y:1.0},{x:0,y:-1.0}],pw:.6,ph:.7};
 const isSOT=c=>c&&c.pat==='sot23';
-const ICPATNAME=k=>k==='sot23'?L('транзистор','transistor'):(ICPAT[k]||ICPAT[k==='d2v'||k==='d2h'?'d2':''])?.[0]||'';   /* old saves: d2v / d2h */
+const ICPATNAME=k=>(k==='sot23'||SOTN[k])?L('транзистор','transistor'):(ICPAT[k]||ICPAT[k==='d2v'||k==='d2h'?'d2':''])?.[0]||'';   /* old saves: d2v / d2h */
 /* placement orientation (screen degrees, CW): rot 0 = pins on left/right (2 sides), pin 1 top-left */
 let icRot=0, placing=false, icPin0=1;   /* icPin0: start pin of an in-line connector */   /* placing: «Поставить» armed inside the K mode */
 const isIC=c=>!!c.pads;
@@ -1180,6 +1182,9 @@ function icLayout(pat,n,x0,y0,x1,y1){ /* screen rect -> pad screen points, CCW f
   const lerp=(a,b,t)=>a+(b-a)*t, f=(i,k)=>k>1?i/(k-1):.5, out=[];
   if(pat==='l1'){ const hor=x1-x0>=y1-y0;
     for(let i=0;i<n;i++) out.push(hor?{x:lerp(x0,x1,f(i,n)),y:(y0+y1)/2}:{x:(x0+x1)/2,y:lerp(y0,y1,f(i,n))}); return out; }
+  if(pat==='s3') return [{x:x0,y:y1},{x:x1,y:y1},{x:(x0+x1)/2,y:y0}];   /* SOT: pins 1.. along the bottom, the rest back along the top */
+  if(pat==='s5') return [{x:x0,y:y1},{x:(x0+x1)/2,y:y1},{x:x1,y:y1},{x:x1,y:y0},{x:x0,y:y0}];
+  if(pat==='s6') return [{x:x0,y:y1},{x:(x0+x1)/2,y:y1},{x:x1,y:y1},{x:x1,y:y0},{x:(x0+x1)/2,y:y0},{x:x0,y:y0}];
   if(pat==='q4'){ const k=[0,1,2,3].map(j=>Math.floor(n/4)+(j<n%4?1:0)), g=(i,kk)=>(i+1)/(kk+1);
     for(let i=0;i<k[0];i++) out.push({x:x0,y:lerp(y0,y1,g(i,k[0]))});   /* left, down  */
     for(let i=0;i<k[1];i++) out.push({x:lerp(x0,x1,g(i,k[1])),y:y1});   /* bottom, right */
@@ -1193,7 +1198,7 @@ function icLayout(pat,n,x0,y0,x1,y1){ /* screen rect -> pad screen points, CCW f
                    for(let i=0;i<b;i++) out.push({x:lerp(x1,x0,f(i,b)),y:y0}); }
   return out;
 }
-function icSizeLabel(pat,n){ return pat==='q4'?'QFP-'+n:pat==='l1'?'1×'+n:'2×'+Math.ceil(n/2); }
+function icSizeLabel(pat,n){ if(SOTN[pat]) return 'SOT23-'+SOTN[pat]; return pat==='q4'?'QFP-'+n:pat==='l1'?'1×'+n:'2×'+Math.ceil(n/2); }
 /* placement frame in the rotated axes: start corner s, opposite corner e (vp px) -> local rect + mapper back to screen */
 function icFrame(sx,sy,ex,ey){
   const a=icRot*Math.PI/180, d=rotV({x:ex-sx,y:ey-sy},-a);
@@ -1202,20 +1207,27 @@ function icFrame(sx,sy,ex,ey){
   return {x0,y0,x1,y1,toS, corners:[{x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},{x:x0,y:y1}].map(toS)};
 }
 const icN=()=>Math.max(1,Math.min(400,icPins|0));
+const SOTN={s3:3,s5:5,s6:6};
+const frameKind=()=>compKind==='U'||compKind==='Q';   /* parts placed with a frame over the pins */
+const plPat=()=>compKind==='Q'?sotPat:icPat, plN=()=>compKind==='Q'?SOTN[sotPat]:icN();
 function addIC(f){ /* placement frame -> new IC with pads on its border */
   const r=vp.getBoundingClientRect(), W=q=>worldFromEvent({clientX:r.left+q.x,clientY:r.top+q.y});
-  const n=icN(), kind=icPat==='l1'?'J':'U';
+  const pat=plPat(), n=plN(), kind=compKind==='Q'?'Q':pat==='l1'?'J':'U';
   compSeq[kind]=compSeq[kind]||1;
   const ctr=W(f.toS({x:(f.x0+f.x1)/2,y:(f.y0+f.y1)/2}));
-  const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), kind, pat:icPat,
-    size:icSizeLabel(icPat,n), side:compSide, x:ctr.x, y:ctr.y, rot:0, des:kind+(compSeq[kind]++),
-    val:compVal[kind]||'', pads:icLayout(icPat,n,f.x0,f.y0,f.x1,f.y1).map(q=>({...W(f.toS(q)),net:null})),
-    ...(icPat==='l1'&&icPin0!==1?{pin0:icPin0}:{})};
+  const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), kind, pat,
+    size:icSizeLabel(pat,n), side:compSide, x:ctr.x, y:ctr.y, rot:0, des:kind+(compSeq[kind]++),
+    val:compVal[kind]||'', pads:icLayout(pat,n,f.x0,f.y0,f.x1,f.y1).map(q=>({...W(f.toS(q)),net:null})),
+    ...(pat==='l1'&&icPin0!==1?{pin0:icPin0}:{})};
   autoPins(c); comps.push(c);
   if(!showSide[c.side]) showSide[c.side]=true;
   selComp=c.id; renderComps(); drawMarks(); save();
 }
-const icPadR=()=>mmScale?Math.max(mmScale*.45,4/Math.abs(view.z)):10/Math.abs(view.z);   /* world radius of a pad */
+const icPadR0=()=>mmScale?Math.max(mmScale*.45,4/Math.abs(view.z)):10/Math.abs(view.z);
+/* world pick radius of a part's pad: never more than half the distance to its nearest neighbour (small SOT / SC70) */
+function icPadR(c){ const R=icPadR0(); if(!c||!c.pads||c.pads.length<2) return R; let d=Infinity;
+  c.pads.forEach((a,i)=>{ for(let j=i+1;j<c.pads.length;j++) d=Math.min(d,Math.hypot(a.x-c.pads[j].x,a.y-c.pads[j].y)); });
+  return Math.min(R,d*.5); }
 /* NET name inside a pad: font shrinks to fit w×h (screen px), skipped when it would be unreadable */
 function padNet(cx,cy,w,h,nc,hot){
   if(!nc||!nc.name) return;
@@ -1228,6 +1240,8 @@ function icBox(c){ const p=screenOf(c), w=Math.max(30,c.des.length*7.6+12); retu
 /* pad index groups per package side, in icLayout order (pin 1 first) */
 function icSides(c){ const n=c.pads.length, ix=(a,b)=>Array.from({length:b-a},(_,i)=>a+i);
   if(c.pat==='l1') return [ix(0,n)];
+  if(c.pat==='s3') return [ix(0,2),ix(2,n)];
+  if(c.pat==='s5'||c.pat==='s6') return [ix(0,3),ix(3,n)];
   if(c.pat==='q4'){ const k=[0,1,2,3].map(j=>Math.floor(n/4)+(j<n%4?1:0)); let o=0;
     return k.map(kk=>{ const r=ix(o,o+kk); o+=kk; return r; }).filter(g=>g.length); }
   const h=Math.ceil(n/2); return [ix(0,h),ix(h,n)].filter(g=>g.length);
@@ -1258,11 +1272,13 @@ function icGeom(c){
     else{ if(dot(sub(C,P[g[0]]),nv)<0) nv={x:-nv.x,y:-nv.y};   /* inward */
       depth=Math.min(depth,Math.max(...P.map(q=>dot(sub(q,P[g[0]]),nv)))); }
     g.forEach(i=>{ U[i]=u; N[i]=nv; }); });
+  if(c.pat==='s3') pitch/=2;
   if(!Number.isFinite(pitch)) pitch=20;
   /* pad size on screen follows the pitch and the body size */
   const round=conn&&c.ps!=='rect';
   const pw=conn?pitch*.7:Math.max(4,pitch*.55);
-  const pl=conn?pitch*1.1:Math.max(6,Math.min(pitch*1.5,(Number.isFinite(depth)?depth:pitch*6)*.28));
+  const sot=!!SOTN[c.pat];   /* SOT: long pads, half the row distance */
+  const pl=conn?pitch*1.1:sot&&Number.isFinite(depth)?depth*.45:Math.max(6,Math.min(pitch*1.5,(Number.isFinite(depth)?depth:pitch*6)*.28));
   const rr=Math.max(5,Math.min(22,pitch*.42)), half=round?rr:pl/2;
   return {b,P,n,conn,C,U,N,pitch,depth,round,pw,pl,rr,half,dot,sub};
 }
@@ -1351,7 +1367,9 @@ function drawSOT(c,col,isSel){
 }
 function drawICCursor(){ /* pictogram at the cursor: part outline, pin stubs, pin 1 dot, turned by icRot */
   const r=vp.getBoundingClientRect(), m={x:mouseAt.clientX-r.left,y:mouseAt.clientY-r.top};
-  const hw=icPat==='q4'?18:icPat==='l1'?26:13, hh=icPat==='q4'?18:icPat==='l1'?6:21;   /* local half sizes */
+  const icPat=plPat();   /* local: SOT patterns share the IC pictogram code */
+  const sot=!!SOTN[icPat];
+  const hw=sot?14:icPat==='q4'?18:icPat==='l1'?26:13, hh=sot?8:icPat==='q4'?18:icPat==='l1'?6:21;   /* local half sizes */
   const a=icRot*Math.PI/180, P=q=>{ const v=rotV(q,a); return {x:m.x+v.x,y:m.y+v.y}; };
   const g=svg('g',{opacity:.9}), add=n=>g.appendChild(n);
   const line=(p,q)=>{ const A=P(p), B=P(q); add(svg('line',{x1:A.x,y1:A.y,x2:B.x,y2:B.y,stroke:'#e8b04b','stroke-width':2})); };
@@ -1359,11 +1377,13 @@ function drawICCursor(){ /* pictogram at the cursor: part outline, pin stubs, pi
   add(svg('polygon',{points:box.map(q=>q.x+','+q.y).join(' '),fill:'rgba(0,0,0,.35)',stroke:'#000','stroke-width':3,opacity:.5}));
   add(svg('polygon',{points:box.map(q=>q.x+','+q.y).join(' '),fill:'none',stroke:'#e8b04b','stroke-width':1.4}));
   const st=5, k=3;
-  if(icPat==='l1') for(let i=0;i<5;i++){ const x=-hw+4+i*(2*hw-8)/4; line({x,y:-hh},{x,y:-hh-st}); line({x,y:hh},{x,y:hh+st}); }
+  if(sot){ const xs=[-hw+4,0,hw-4], bot=icPat==='s3'?[xs[0],xs[2]]:xs, top=icPat==='s3'?[0]:icPat==='s5'?[xs[0],xs[2]]:xs;
+    bot.forEach(x=>line({x,y:hh},{x,y:hh+st})); top.forEach(x=>line({x,y:-hh},{x,y:-hh-st})); }
+  else if(icPat==='l1') for(let i=0;i<5;i++){ const x=-hw+4+i*(2*hw-8)/4; line({x,y:-hh},{x,y:-hh-st}); line({x,y:hh},{x,y:hh+st}); }
   else for(let i=0;i<k;i++){ const t=(i+1)/(k+1);
     const y=-hh+2*hh*t; line({x:-hw,y},{x:-hw-st,y}); line({x:hw,y},{x:hw+st,y});
     if(icPat==='q4'){ const x=-hw+2*hw*t; line({x,y:-hh},{x,y:-hh-st}); line({x,y:hh},{x,y:hh+st}); } }
-  const p1=P(icPat==='l1'?{x:-hw+4,y:0}:{x:-hw+4.5,y:-hh+4.5});
+  const p1=P(sot?{x:-hw+4,y:hh-3.5}:icPat==='l1'?{x:-hw+4,y:0}:{x:-hw+4.5,y:-hh+4.5});
   add(svg('circle',{cx:p1.x,cy:p1.y,r:2.6,fill:'#e8b04b'}));
   marks.appendChild(g);
 }
@@ -1374,13 +1394,14 @@ function hitICPad(e){ /* screen-space pick of an IC pad -> {c,i} */
   return best;
 }
 function moveComp(c,dx,dy){ c.x+=dx; c.y+=dy; if(c.pads) c.pads.forEach(pd=>{ pd.x+=dx; pd.y+=dy; }); }
-function icAutoPins(c){ /* nearest visible NET point within a pad radius sets that pad's net */
-  const R=icPadR(); let ch=false;
-  c.pads.forEach(pd=>{ let best=null, bd=R;
-    points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
-      if(!net||!net.on||!lay||!ptShown(pt,lay)) return;
-      const w=worldOf(lay,pt.p), d=Math.hypot(w.x-pd.x,w.y-pd.y); if(d<bd){ bd=d; best=net.id; } });
-    if(best&&pd.net!==best){ pd.net=best; ch=true; } });
+function icAutoPins(c){ /* nearest visible NET point within a pad radius sets that pad's net; a point serves one pad */
+  const R=icPadR(c); let ch=false; const best=c.pads.map(()=>null);
+  points.forEach(pt=>{ const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
+    if(!net||!net.on||!lay||!ptShown(pt,lay)) return;
+    const w=worldOf(lay,pt.p); let bi=-1, bd=R;
+    c.pads.forEach((pd,i)=>{ const d=Math.hypot(w.x-pd.x,w.y-pd.y); if(d<bd){ bd=d; bi=i; } });
+    if(bi>=0&&(!best[bi]||bd<best[bi].d)) best[bi]={net:net.id,d:bd}; });
+  c.pads.forEach((pd,i)=>{ if(best[i]&&pd.net!==best[i].net){ pd.net=best[i].net; ch=true; } });
   return ch;
 }
 /* ---------- DRAW: labels and shapes in world coords, shown on their board side (or with XRAY) ---------- */
@@ -1541,9 +1562,9 @@ function drawComps(){
   if(drag&&drag.t==='icrect'&&drag.moved){ /* placement rubber band (rotated axes) + pad preview */
     const f=icFrame(drag.sx,drag.sy,drag.ex,drag.ey);
     marks.appendChild(svg('polygon',{points:f.corners.map(q=>q.x+','+q.y).join(' '),fill:'none',stroke:'#e8b04b','stroke-width':1.2,'stroke-dasharray':'5 4'}));
-    icLayout(icPat,icN(),f.x0,f.y0,f.x1,f.y1).map(f.toS).forEach((q,i)=>marks.appendChild(i===0
+    icLayout(plPat(),plN(),f.x0,f.y0,f.x1,f.y1).map(f.toS).forEach((q,i)=>marks.appendChild(i===0
       ? svg('rect',{x:q.x-4,y:q.y-4,width:8,height:8,fill:'#e8b04b'}) : svg('circle',{cx:q.x,cy:q.y,r:3.5,fill:'#e8b04b'})));
-  } else if(clickMode==='comp'&&placing&&compKind==='U'&&!drag&&mouseAt) drawICCursor();
+  } else if(clickMode==='comp'&&placing&&frameKind()&&!drag&&mouseAt) drawICCursor();
   if(showComps) comps.forEach(c=>{
     if(!showSide[c.side])return;
     if(isSOT(c)){ drawSOT(c,SIDECOL[c.side],c.id===selComp); return; }
@@ -1662,9 +1683,9 @@ function autoPins(c){
 }
 function pinFromPoint(w,net,via){ /* new net point: write its net into the pin it lands on (via: either side) */
   let best=null;
-  { let pb=null, bd=icPadR();                      /* IC pads first */
-    comps.forEach(c=>{ if(!isIC(c)||(!via&&!showSide[c.side])) return;
-      c.pads.forEach(pd=>{ const d=Math.hypot(pd.x-w.x,pd.y-w.y); if(d<bd){ bd=d; pb={c,pd}; } }); });
+  { let pb=null, bd=Infinity;                      /* IC pads first */
+    comps.forEach(c=>{ if(!isIC(c)||(!via&&!showSide[c.side])) return; const R=icPadR(c);
+      c.pads.forEach(pd=>{ const d=Math.hypot(pd.x-w.x,pd.y-w.y); if(d<R&&d<bd){ bd=d; pb={c,pd}; } }); });
     if(pb){ pb.pd.net=net; if(pb.c.id===selComp) renderProps(); return true; } }
   comps.forEach(c=>{ if(isIC(c)||(!via&&!showSide[c.side]))return; const z=pinZone(c,w);
     if(z&&(!best||z.d<best.z.d)) best={c,z}; });
@@ -1674,15 +1695,9 @@ function pinFromPoint(w,net,via){ /* new net point: write its net into the pin i
   return true;
 }
 function addComp(m){
-  if(!mmScale||compKind==='U') return;
+  if(!mmScale||frameKind()) return;
   compSeq[compKind]=compSeq[compKind]||1;
   const kind=compKind, des=kind+(compSeq[kind]++);
-  if(kind==='Q'){ const a=compRot*Math.PI/180;   /* SOT-23: pads at the real footprint, turned by compRot */
-    const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), kind, pat:'sot23', size:'SOT-23',
-      side:compSide, x:m.x, y:m.y, rot:compRot, des, val:compVal[kind]||'',
-      pads:SOT23.pads.map(q=>{ const v=rotV({x:q.x*mmScale,y:q.y*mmScale},a); return {x:m.x+v.x,y:m.y+v.y,net:null}; })};
-    autoPins(c); comps.push(c);
-    if(!showSide[c.side]) showSide[c.side]=true; selComp=c.id; renderComps(); drawMarks(); save(); return; }
   const c={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
     kind, size:compSize, side:compSide, x:m.x, y:m.y, rot:compRot, des, val:compVal[kind]||'', n1:null, n2:null};
   autoPins(c); comps.push(c);
@@ -1809,7 +1824,7 @@ function rotateComp(d){
   if(clickMode==='calib'&&calib){ calib.rot=(((calib.rot||0)+d)%360+360)%360;
     compRot=calib.rot; drawMarks(); syncComps(); return; }
   const c=comps.find(o=>o.id===selComp);
-  if(clickMode==='comp'&&placing&&compKind==='U'&&(!c||(drag&&drag.t==='icrect'))){   /* placement orientation */
+  if(clickMode==='comp'&&placing&&frameKind()&&(!c||(drag&&drag.t==='icrect'))){   /* placement orientation */
     icRot=(((icRot+d)%360)+360)%360; drawMarks(); syncComps(); save(); return; }
   if(c&&clickMode==='comp'&&isIC(c)){ const a=d*Math.PI/180*((!!view.fh!==!!view.fv)?-1:1);   /* IC: turn pads about the body */
     c.pads.forEach(pd=>{ const v=rotV({x:pd.x-c.x,y:pd.y-c.y},a); pd.x=c.x+v.x; pd.y=c.y+v.y; });
@@ -1825,11 +1840,11 @@ function syncComps(){
   $('kindR').classList.toggle('on',compKind==='R');
   $('kindC').classList.toggle('on',compKind==='C');
   $('kindU').classList.toggle('on',compKind==='U'); $('kindQ').classList.toggle('on',compKind==='Q');
-  $('icPatRow').hidden=$('icPinsRow').hidden=compKind!=='U'; $('compSizeRow').hidden=compKind==='U'||compKind==='Q';
+  $('icPatRow').hidden=$('icPinsRow').hidden=compKind!=='U'; $('compSizeRow').hidden=frameKind(); $('sotPatRow').hidden=compKind!=='Q'; $('sotPat').value=sotPat;
   $('icPat').value=icPat; if(document.activeElement!==$('icPins')) $('icPins').value=icPins;
   $('icPin0Row').hidden=compKind!=='U'||icPat!=='l1'; if(document.activeElement!==$('icPin0')) $('icPin0').value=icPin0;
   $('compSize').value=compSize; $('compSide').value=compSide;
-  $('compPick').disabled=!mmScale&&compKind!=='U';
+  $('compPick').disabled=!mmScale&&!frameKind();
   if(clickMode!=='comp') placing=false;
   $('compPlace').disabled=$('compPick').disabled; $('compPlace').classList.toggle('on',placing);
   $('compPick').classList.toggle('on',clickMode==='comp');
@@ -1853,11 +1868,11 @@ function syncComps(){
         : L('<span class="bad">Масштаб не задан.</span> Нажмите «Калибровать».','<span class="bad">Scale not set.</span> Press “Calibrate”.'));
   const editTip=L('Клик по компоненту — выбрать, перетаскивание — двигать (пад IC — отдельно), Space — поворот на 45°, клик по пустому — снять выбор. Новые — кнопка «Поставить».',
     'Click a component — select, drag — move (an IC pad on its own), Space — rotate 45°, click empty — deselect. New parts — “Place”.');
-  $('compStatus').innerHTML = (compKind!=='U'&&!mmScale) ? L('Сначала калибровка масштаба.','Calibrate the scale first.')
+  $('compStatus').innerHTML = (!frameKind()&&!mmScale) ? L('Сначала калибровка масштаба.','Calibrate the scale first.')
     : !(clickMode==='comp'&&placing) ? editTip
-    : compKind==='U'
-       ? L(`Space / Shift+Space — повернуть пиктограмму (${icRot}°, кружок — вывод 1), затем растяните рамку по крайним выводам — встанут ${icPins} падов. Esc — закончить.`,
-           `Space / Shift+Space — turn the pictogram (${icRot}°, dot — pin 1), then drag a frame over the outer pins — ${icPins} pads appear. Esc — finish.`)
+    : frameKind()
+       ? L(`Space / Shift+Space — повернуть пиктограмму (${icRot}°, кружок — вывод 1), затем растяните рамку по крайним выводам — встанут ${plN()} падов. Esc — закончить.`,
+           `Space / Shift+Space — turn the pictogram (${icRot}°, dot — pin 1), then drag a frame over the outer pins — ${plN()} pads appear. Esc — finish.`)
        : L(`Клик по плате ставит <b>${compKind}${compSeq[compKind]||1}</b> · ${compKind==='Q'?'SOT-23':compSize} · ${compSide}-comp · ${compRot}°. Esc — закончить.`,
            `A click on the board places <b>${compKind}${compSeq[compKind]||1}</b> · ${compKind==='Q'?'SOT-23':compSize} · ${compSide}-comp · ${compRot}°. Esc — finish.`)
        + (clickMode==='move'||clickMode==='crop' ? L('<br><b>Режим правки слоя</b> — компоненты сейчас не ловятся.','<br><b>Layer edit mode</b> — components are not picked now.') : '');
@@ -2221,7 +2236,7 @@ function snapshot(){
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe})),
     nets, points, activeNet, netSeq,
-    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, icRot, icPin0, compVal, sideCol:SIDECOL, sideOp, xrayOp, showSide, showNets, showComps, notes, showDraw, drawStyle, warpModel, imgDir, projName};
+    comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, sotPat, icRot, icPin0, compVal, sideCol:SIDECOL, sideOp, xrayOp, showSide, showNets, showComps, notes, showDraw, drawStyle, warpModel, imgDir, projName};
 }
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
@@ -2253,7 +2268,7 @@ function restore(s){
   activeNet=s.activeNet||(nets[0]?nets[0].id:null); netSeq=s.netSeq||nets.length+1;
   comps=Array.isArray(s.comps)?s.comps:[]; mmScale=+s.mmScale||0;
   compSeq=s.compSeq||{R:1,C:1}; compKind=s.compKind||'R'; compSize=s.compSize||'0603';
-  icPat=ICPAT[s.icPat]?s.icPat:'d2'; icPins=+s.icPins||8;
+  icPat=ICPAT[s.icPat]?s.icPat:'d2'; icPins=+s.icPins||8; sotPat=SOTN[s.sotPat]?s.sotPat:'s3';
   icRot=typeof s.icRot==='number'?s.icRot:(s.icPat==='d2h'?270:0); icPin0=Number.isFinite(s.icPin0)?s.icPin0:1;
   compSide=s.compSide||'top'; compRot=+s.compRot||0;
   compVal=Object.assign({R:'',C:''},s.compVal||{});
@@ -2545,7 +2560,7 @@ vp.addEventListener('pointerdown',e=>{
       drag={t:'comp',id:hc.id,x:e.clientX,y:e.clientY,moved:false,ox:hc.x,oy:hc.y,
         pads:hc.pads?hc.pads.map(pd=>({x:pd.x,y:pd.y})):null};
       vp.setPointerCapture(e.pointerId); return; }
-    if(clickMode==='comp'&&placing&&compKind==='U'){ const q=evXY(e);   /* drag a rectangle over the part's pins */
+    if(clickMode==='comp'&&placing&&frameKind()){ const q=evXY(e);   /* drag a rectangle over the part's pins */
       drag={t:'icrect',x:e.clientX,y:e.clientY,moved:false,sx:q.x,sy:q.y,ex:q.x,ey:q.y};
       vp.setPointerCapture(e.pointerId); return; }
   }
@@ -2562,7 +2577,7 @@ vp.addEventListener('pointermove',e=>{
       if(h==='sx'||h==='sy'){ const q=layerBox(sel_()).q, v=h==='sx'?{x:q[1].x-q[0].x,y:q[1].y-q[0].y}:{x:q[3].x-q[0].x,y:q[3].y-q[0].y};
         c=Math.abs(v.x)>=Math.abs(v.y)?'ew-resize':'ns-resize'; }
       vp.style.cursor=c; }
-    if(clickMode==='comp'&&placing&&compKind==='U'){ mouseAt={clientX:e.clientX,clientY:e.clientY}; drawMarks(); }
+    if(clickMode==='comp'&&placing&&frameKind()){ mouseAt={clientX:e.clientX,clientY:e.clientY}; drawMarks(); }
     if(clickMode==='crop'){ const h=sel_()&&hitCropBox(e);
       vp.style.cursor=!h?'':h.ex==='in'?'move':(h.ex&&h.ey)?'nwse-resize':h.ex?'ew-resize':'ns-resize'; }
     return; }
@@ -2825,6 +2840,7 @@ $('kindU').onclick=()=>{compKind='U';syncComps();save()};
 $('kindQ').onclick=()=>{compKind='Q';syncComps();save()};
 Object.entries(ICPAT).forEach(([k,[t]])=>{ const o=document.createElement('option'); o.value=k; o.textContent=t; $('icPat').appendChild(o); });
 $('icPat').onchange=e=>{icPat=e.target.value;syncComps();save()};
+$('sotPat').onchange=e=>{sotPat=e.target.value;syncComps();drawMarks();save()};
 $('icPins').onchange=e=>{ icPins=Math.max(1,Math.min(400,parseInt(e.target.value,10)||8)); syncComps(); save(); };
 $('icPin0').onchange=e=>{ const v=parseInt(e.target.value,10); icPin0=Number.isFinite(v)?v:1; syncComps(); save(); };
 $('compSize').onchange=e=>{compSize=e.target.value;syncComps();save()};
