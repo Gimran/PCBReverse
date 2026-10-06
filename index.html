@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Совмещение сторон платы</title>
+<title>PCBReverse</title>
+<script>try{document.documentElement.lang=localStorage.getItem("pcbr-lang")==="ru"?"ru":"en";}catch(e){}</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2064%2064%27%3E%3Crect%20width%3D%2764%27%20height%3D%2764%27%20rx%3D%2713%27%20fill%3D%27%230d1713%27%2F%3E%3Crect%20x%3D%2715%27%20y%3D%2719%27%20width%3D%2729%27%20height%3D%2729%27%20rx%3D%273%27%20fill%3D%27%231e7a4e%27%20opacity%3D%27.5%27%2F%3E%3Crect%20x%3D%2721%27%20y%3D%2724%27%20width%3D%2729%27%20height%3D%2729%27%20rx%3D%273%27%20fill%3D%27%232da96c%27%2F%3E%3Crect%20x%3D%2725%27%20y%3D%2729%27%20width%3D%279%27%20height%3D%275%27%20rx%3D%271%27%20fill%3D%27%23e8b04b%27%2F%3E%3Crect%20x%3D%2738%27%20y%3D%2729%27%20width%3D%279%27%20height%3D%275%27%20rx%3D%271%27%20fill%3D%27%23e8b04b%27%2F%3E%3Cpath%20d%3D%27M29.5%2034%20V42%20H42.5%20V37%27%20stroke%3D%27%23e8b04b%27%20stroke-width%3D%272.6%27%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3Ccircle%20cx%3D%2729.5%27%20cy%3D%2747%27%20r%3D%273.1%27%20fill%3D%27none%27%20stroke%3D%27%23e8b04b%27%20stroke-width%3D%272.4%27%2F%3E%3Cpath%20d%3D%27M11%2033%20A15%2015%200%200%201%2026%2018%27%20stroke%3D%27%23eae6da%27%20stroke-width%3D%274%27%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%2F%3E%3Cpath%20d%3D%27M24%2011%20l8%207%20-8%207%20z%27%20fill%3D%27%23eae6da%27%2F%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
@@ -73,7 +74,7 @@ h1{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-weight:
   user-select:none;-webkit-user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
 @keyframes blinkfade{0%,100%{opacity:var(--op,1)}50%{opacity:calc(var(--op,1) * .12)}}
 .lbox.blink{animation:blinkfade 1.1s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){ .lbox.blink{animation:none;outline:2px dashed #e0c98a;outline-offset:4px} }
+/* no prefers-reduced-motion override: blinking is an explicit tool, toggled by the «мигание» button */
 svg.marks{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}
 .hud{position:absolute;left:12px;bottom:12px;display:flex;gap:6px;flex-wrap:wrap;z-index:21;
   font-family:"IBM Plex Mono",monospace;font-size:11px;color:#9fb0a8;pointer-events:none;max-width:calc(100% - 24px)}
@@ -95,7 +96,8 @@ svg.marks{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visi
 @media (max-width:880px){ .panel{border-left:0;border-top:1px solid var(--line)} }
 .phead{padding:13px 16px 11px;border-bottom:1px solid var(--line)}
 .tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
-.lpanel .tabs{grid-template-columns:repeat(4,1fr) 30px}
+.lpanel .tabs{grid-template-columns:repeat(4,1fr) 30px 30px}
+html[lang="en"] [data-only="ru"],html[lang="ru"] [data-only="en"]{display:none!important}
 .tabs button{border:0;border-radius:0;background:transparent;box-shadow:none;padding:9px 4px;
   font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.05em;color:var(--muted);
   border-bottom:2px solid transparent}
@@ -217,6 +219,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       <button data-ltab="warp" title="деформация по опорным точкам">ДЕФОРМ</button>
       <button data-ltab="comp" title="компоненты">КОМП</button>
       <button data-ltab="keys" title="клавиши">?</button>
+      <button id="langBtn" title="English">EN</button>
     </div>
     <div class="pages">
       <div data-lpage="view">
@@ -224,7 +227,6 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <div class="lbl">Вид отображения</div>
           <div class="row">
             <button class="mini" id="flipBoard" style="flex:1">Перевернуть плату (F)</button>
-            <button class="mini" id="xrayBtn" title="рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы">XRAY</button>
           </div>
           <div class="row"><span class="lbl" style="flex:none">Показать</span>
             <button class="mini on" id="showNetsBtn" style="flex:1" title="точки всех NET">NETS</button>
@@ -256,7 +258,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="projSave" title="*.pcbr — zip без сжатия: project.json (слои, деформация, NET, компоненты, вид) + оригиналы картинок">Сохранить проект</button>
             <button class="mini" id="projLoad" title="открыть *.pcbr (или старый JSON-экспорт)">Загрузить проект</button>
             <button class="mini" id="saveNow" title="записать состояние в браузер сейчас (автосохранение и так включено)">Сохранить сейчас</button>
-            <button class="mini" id="resetAll" title="очистить состояние и картинки в браузере и перезагрузить страницу">Сбросить всё</button>
+            <button class="mini" id="newProj" title="пустой проект: слои TOP main / BOT main без картинок; текущие слои, картинки, NET и компоненты удаляются из браузера (с подтверждением)">Новый проект</button>
           </div>
         </div>
       </div>
@@ -320,7 +322,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
       </div>
       <div data-lpage="keys" hidden>
         <div class="sect">
-          <div class="keys">
+          <div class="keys" data-only="ru">
             Картинки по путям — в папке <b>pcb_overlay_img/</b> рядом с index.html;<br>
             выбранные файлы хранятся в браузере и в проекте <b>*.pcbr</b>.<br><br>
             <b>1…8</b> — видимость слоя · <b>X</b> — следующий слой<br>
@@ -329,8 +331,20 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <b>[ ]</b> — поворот 0.1° · <b>Shift</b> — ×10<br>
             <b>P</b> — опорные точки · <b>N</b> — редактирование NET · <b>K</b> — редактирование компонентов<br>
             <b>Alt+клик</b> в режиме N — переходное отверстие (точка на обеих сторонах)<br>
-            <b>Ctrl+клик</b> в режиме N — новый NET с первой точкой, сразу ввод имени<br>
+            <b>Ctrl+клик</b> в режиме N — новый NET с первой точкой-via (сквозной), сразу ввод имени<br>
             <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>правый клик</b> / <b>Delete</b> — удалить (только в режимах N / K) · <b>Esc</b> — выход
+          </div>
+          <div class="keys" data-only="en">
+            Images given by path are looked up in <b>pcb_overlay_img/</b> next to index.html;<br>
+            files you choose are kept in the browser and in the <b>*.pcbr</b> project.<br><br>
+            <b>1…8</b> — layer visibility · <b>X</b> — next layer<br>
+            <b>wheel</b> — zoom · <b>middle button</b> — pan<br><b>R</b> / <b>Shift+R</b> — rotate view 90°<br><b>H</b> / <b>V</b> — mirror view<br>
+            <b>M</b> — move the layer with mouse and arrows<br><b>F</b> — flip board<br>
+            <b>[ ]</b> — rotate 0.1° · <b>Shift</b> — ×10<br>
+            <b>P</b> — reference points · <b>N</b> — edit NETs · <b>K</b> — edit components<br>
+            <b>Alt+click</b> in N mode — via (point on both sides)<br>
+            <b>Ctrl+click</b> in N mode — new NET whose first point is a via, then type its name<br>
+            <b>Space</b> / <b>Shift+Space</b> — rotate component 45°<br><b>right-click</b> / <b>Delete</b> — delete (N / K modes only) · <b>Esc</b> — exit mode
           </div>
         </div>
       </div>
@@ -416,10 +430,11 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
         <div class="sect">
           <button class="mini wide" id="addLayer" title="новый слой на текущей стороне платы; сразу выбрать картинку">+ Добавить слой</button>
           <div class="lbl">Режим просмотра</div>
-          <div class="modes three">
-            <button class="mini on" data-vm="all">все</button>
-            <button class="mini" data-vm="solo">только актив</button>
+          <div class="modes">
+            <button class="mini on" data-vm="all" title="все включённые слои текущей стороны платы">сторона</button>
+            <button class="mini" data-vm="solo" title="только активный слой">актив</button>
             <button class="mini" data-vm="swipe">шторка</button>
+            <button class="mini" id="xrayBtn" title="рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы (поверх любого режима)">XRAY</button>
           </div>
           <div class="row"><span class="lbl" style="flex:none">Опора</span>
             <select id="refSel" class="slim"></select></div>
@@ -450,7 +465,7 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="addNet" title="новый NET">+ NET</button>
             <button class="mini" id="delPoint" disabled title="удалить выбранную точку">− точка</button>
             <button class="mini" id="clearNetPts" disabled title="удалить все точки активного NET">очистить</button>
-            <button class="mini on" id="labelsBtn" title="подписи точек">подписи</button>
+            <button class="mini on" id="labelsBtn" title="подписи точек" data-en="labels">подписи</button>
           </div>
         </div>
         <div class="sect">
@@ -472,19 +487,86 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
 <input type="file" id="fileMany" accept="image/*" multiple hidden>
 
 <script>
+/* ---------- language: EN (default) / RU. Markup is written in Russian and translated by I18N at start;
+   dynamic strings use L(ru,en). Switching saves the state and reloads the page. ---------- */
+const LANGKEY='pcbr-lang';
+let LANG='en'; try{ if(localStorage.getItem(LANGKEY)==='ru') LANG='ru'; }catch(err){}
+const L=(ru,en)=>LANG==='ru'?ru:en, LOC=L('ru-RU','en-GB');
+const I18N={
+  'ВИД':'VIEW','СЛОЙ':'LAYER','ДЕФОРМ':'WARP','КОМП':'PARTS','СЛОИ':'LAYERS','ВИДЕО':'VIDEO',
+  'вид отображения':'display','активный слой: выравнивание, удаление фона':'active layer: alignment, background removal',
+  'деформация по опорным точкам':'warp by reference points','компоненты':'components','клавиши':'keys',
+  'ширина панели; двойной клик — по умолчанию':'panel width; double-click — default',
+  'Вид отображения':'Display','Перевернуть плату (F)':'Flip board (F)','Показать':'Show',
+  'точки всех NET':'points of all NETs','все компоненты':'all components','Вид':'View',
+  'повернуть вид на 90° влево (Shift+R)':'rotate view 90° left (Shift+R)','повернуть вид на 90° вправо (R)':'rotate view 90° right (R)',
+  'отразить вид по горизонтали (H)':'mirror view horizontally (H)','отразить вид по вертикали (V)':'mirror view vertically (V)',
+  '⇄ вид':'⇄ view','⇅ вид':'⇅ view','сбросить поворот и отражения':'reset rotation and mirroring','сброс вида':'reset view',
+  'вписать':'fit','сетка 32 px':'grid 32 px','инверсия цветов':'invert colors',
+  'Состояние':'State','Автосохранение включено.':'Autosave is on.','Указать файлы…':'Locate files…','Сохранить без них':'Save without them',
+  '*.pcbr — zip без сжатия: project.json (слои, деформация, NET, компоненты, вид) + оригиналы картинок':
+    '*.pcbr — uncompressed zip: project.json (layers, warp, NETs, components, view) + original images',
+  'Сохранить проект':'Save project','открыть *.pcbr (или старый JSON-экспорт)':'open *.pcbr (or an old JSON export)',
+  'Загрузить проект':'Open project','записать состояние в браузер сейчас (автосохранение и так включено)':'write the state to the browser now (autosave is on anyway)',
+  'Сохранить сейчас':'Save now',
+  'пустой проект: слои TOP main / BOT main без картинок; текущие слои, картинки, NET и компоненты удаляются из браузера (с подтверждением)':
+    'empty project: TOP main / BOT main layers without images; current layers, images, NETs and components are removed from the browser (asks first)',
+  'Новый проект':'New project',
+  'Выравнивание активного слоя':'Active layer alignment','угол':'angle','угол, °; Enter — применить':'angle, °; Enter — apply',
+  'масшт':'scale','масштаб; Enter — применить':'scale; Enter — apply',
+  'рамка: масштаб / вращение (клик по слою переключает), ⊕ — центр, внутри — сдвиг':'frame: scale / rotate (click the layer to toggle), ⊕ — pivot, inside — move',
+  'Ручная деформация (M)':'Free transform (M)',
+  'обрезать слой: тянуть стороны и углы рамки, внутри — сдвиг рамки':'crop the layer: drag frame sides and corners, inside — move the frame',
+  'Кроп слоя':'Crop layer','сброс слоя':'reset layer','сброс кропа':'reset crop',
+  'Удаление фона':'Background removal','сделать прозрачным цвет фона активного слоя':'make the background color of the active layer transparent',
+  'удалить фон':'remove bg','цвет фона':'background color','пипетка: взять цвет с экрана':'eyedropper: pick a color from the screen',
+  'пипетка':'eyedropper','допуск':'tol',
+  'Для наложения пинаутов из документации: фон картинки становится прозрачным.':'For overlaying pinouts from datasheets: the image background becomes transparent.',
+  'Коррекция цвета':'Color correction','Ч/Б, контраст, резкость — читаемость подписей':'B/W, contrast, sharpness — legible markings',
+  'подписи':'markings','как «подписи» + чёрн 100% + тонировка слоя «осветление» 100% цветом тонировки':'like “markings” + black 100% + layer tint “screen” 100% in the tint color',
+  'ЦВ подписи':'color markings','Ч/Б в два уровня — только тёмное/светлое':'two-level B/W — dark / light only','порог Ч/Б':'B/W threshold','сброс':'reset',
+  'Деформация по опорным точкам':'Warp by reference points','Задать точки':'Set points','мигание':'blink','модель':'model',
+  'аффинная — скан, гербер':'affine — scan, Gerber','перспектива — фото под углом (≥4 точек)':'perspective — angled photo (≥4 points)',
+  'Применить':'Apply','Отменить точку':'Undo point','Очистить точки':'Clear points','Снять деформацию':'Remove warp',
+  'Масштаб платы':'Board scale','эталон':'gauge','px/мм':'px/mm','Калибровать':'Calibrate','Готово':'Done',
+  'Поставить компонент':'Place component','R · резистор':'R · resistor','C · конденсатор':'C · capacitor','корпус':'package','сторона':'side',
+  'Редактирование компонентов (K)':'Edit components (K)','Свойства выбранного':'Selected part','Компонент не выбран.':'No component selected.',
+  'цвет компонентов top':'top component color','цвет компонентов bot':'bot component color','актив: —':'active: —',
+  'экспериментально: камера / USB-микроскоп':'experimental: camera / USB microscope',
+  'новый слой на текущей стороне платы; сразу выбрать картинку':'new layer on the current board side; pick an image right away',
+  '+ Добавить слой':'+ Add layer','Режим просмотра':'View mode','все включённые слои текущей стороны платы':'all enabled layers of the current board side',
+  'только активный слой':'active layer only','актив':'active','шторка':'swipe',
+  'рентген: показывать слои и компоненты обеих сторон, независимо от переворота платы (поверх любого режима)':
+    'X-ray: show layers and components of both sides regardless of board flip (on top of any mode)',
+  'Опора':'Ref','настройки активного слоя':'active layer settings','отразить по горизонтали':'mirror horizontally','отразить по вертикали':'mirror vertically',
+  'цвет слоя (метка) и тонировки':'layer color (tag) and tint','режим тонировки':'tint mode','повернуть −90°':'rotate −90°','повернуть +90°':'rotate +90°',
+  'Редактирование NET (N)':'Edit NETs (N)','новый NET':'new NET','удалить выбранную точку':'delete the selected point','− точка':'− point',
+  'удалить все точки активного NET':'delete all points of the active NET','очистить':'clear','подписи точек':'point labels',
+  'NETS · клик подсвечивает точки':'NETS · click highlights points'
+};
+function i18nStatic(){
+  if(LANG==='ru') return;
+  const tr=v=>{ const k=v.trim(); return k&&I18N[k]?v.replace(k,I18N[k]):v; };
+  const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode:n=>
+    n.parentElement.closest('script,style,[data-only]')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+  for(let n;(n=w.nextNode());) n.nodeValue=n.parentElement.dataset.en||tr(n.nodeValue);
+  document.querySelectorAll('[title]').forEach(el=>el.title=tr(el.title));
+}
+i18nStatic();
+document.title=L('PCBReverse — совмещение сторон платы','PCBReverse — PCB layer overlay');
 "use strict";
-const SVGNS="http://www.w3.org/2000/svg", KEY="pcb-overlay-v4", IMGKEY=id=>"pcb-overlay-img-"+id;
+const SVGNS="http://www.w3.org/2000/svg", KEY="pcb-overlay-v4", IMGKEY=id=>"pcb-overlay-img-"+id, NEWKEY="pcb-overlay-new";
 const NETPAL=["#e05c5c","#e0a844","#57b85d","#68b6dd","#b07ede","#e0d24a","#4ac4b0","#e08ac0"];
 /* colour correction per layer: brightness, contrast, gamma, levels black/white, saturation, sharpen, posterize */
 const COR0={br:0,ct:1,gm:1,lb:0,lw:1,sat:1,sh:0,pz:0};
-const CORUI=[['lb','чёрн',0,1,.005,v=>Math.round(v*100)+'%','уровни: всё темнее — в чёрный'],
-  ['lw','бел',0,1,.005,v=>Math.round(v*100)+'%','уровни: всё светлее — в белый'],
-  ['gm','гамма',.2,4,.01,v=>v.toFixed(2),'гамма: >1 высветляет средние тона'],
-  ['br','ярк',-1,1,.01,v=>(v>0?'+':'')+Math.round(v*100)+'%','яркость'],
-  ['ct','контр',0,4,.01,v=>v.toFixed(2)+'×','контраст'],
-  ['sat','насыщ',0,2,.01,v=>Math.round(v*100)+'%','насыщенность: 0 — Ч/Б'],
-  ['sh','резк',0,3,.05,v=>v.toFixed(2),'резкость'],
-  ['pz','постер',0,16,1,v=>v<2?'выкл':String(v),'постеризация: число уровней на канал']];
+const CORUI=[['lb',L('чёрн','black'),0,1,.005,v=>Math.round(v*100)+'%',L('уровни: всё темнее — в чёрный','levels: everything darker turns black')],
+  ['lw',L('бел','white'),0,1,.005,v=>Math.round(v*100)+'%',L('уровни: всё светлее — в белый','levels: everything lighter turns white')],
+  ['gm',L('гамма','gamma'),.2,4,.01,v=>v.toFixed(2),L('гамма: >1 высветляет средние тона','gamma: >1 lightens midtones')],
+  ['br',L('ярк','bright'),-1,1,.01,v=>(v>0?'+':'')+Math.round(v*100)+'%',L('яркость','brightness')],
+  ['ct',L('контр','contr'),0,4,.01,v=>v.toFixed(2)+'×',L('контраст','contrast')],
+  ['sat',L('насыщ','satur'),0,2,.01,v=>Math.round(v*100)+'%',L('насыщенность: 0 — Ч/Б','saturation: 0 — B/W')],
+  ['sh',L('резк','sharp'),0,3,.05,v=>v.toFixed(2),L('резкость','sharpness')],
+  ['pz',L('постер','poster'),0,16,1,v=>v<2?L('выкл','off'):String(v),L('постеризация: число уровней на канал','posterize: levels per channel')]];
 const corActive=c=>Object.keys(COR0).some(k=>Math.abs(c[k]-COR0[k])>1e-9);
 const LAYPAL=["#e0a844","#68b6dd","#57b85d","#e05c5c","#b07ede","#4ac4b0","#e08ac0","#c9c35a"];
 const $=id=>document.getElementById(id);
@@ -519,9 +601,9 @@ function freeId(){ let n=1; while(layers.some(l=>l.id==='L'+n)) n++; return 'L'+
 function mkLayer(i,init){
   const id=(init&&init.id)||freeId();
   const l=Object.assign({
-    id, name:'Слой '+(i+1), color:LAYPAL[i%LAYPAL.length], side:'any',
+    id, name:L('Слой ','Layer ')+(i+1), color:LAYPAL[i%LAYPAL.length], side:'any',
     src:'', stored:false, ok:false,
-    x:0,y:0,rot:0,scale:1,fh:false,fv:false,op:1,on:true,H:null,
+    x:0,y:0,rot:0,scale:1,sx:1,sy:1,fh:false,fv:false,op:1,on:true,H:null,
     tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15, cor:{...COR0}, crop:null, main:false, parent:null, fe:0,
     w:1200,h:1200, pairs:[]
   },init||{});
@@ -592,7 +674,7 @@ function layersChanged(){
 }
 function addLayer(){ /* new layer on the current board side, top of its group, becomes active */
   const n=parseInt(freeId().slice(1),10);
-  const l=mkLayer(n-1,{side:boardSide}); l.name='Слой '+n;
+  const l=mkLayer(n-1,{side:boardSide}); l.name=L('Слой ','Layer ')+n;
   layers.push(l); sel=l.id; layersChanged(); return l;
 }
 /* soft edges: two linear gradients intersected, positions in element px */
@@ -614,14 +696,14 @@ function attachVideo(l){
 }
 async function startCam(l,quiet){
   stopCam(l); l.camErr='';
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ l.camErr='браузер не даёт доступ к камере'; refreshFiles(); return; }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ l.camErr=L('браузер не даёт доступ к камере','the browser gives no camera access'); refreshFiles(); return; }
   try{
     l.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{
       ...(l.camId?{deviceId:{exact:l.camId}}:{}), width:{ideal:1920}, height:{ideal:1080}}});
     l.vid.srcObject=l.stream; await l.vid.play().catch(()=>{});
     const tr=l.stream.getVideoTracks()[0]; if(tr&&!l.camId) l.camId=tr.getSettings().deviceId||'';
     await listCams(); save();
-  }catch(err){ l.stream=null; l.camErr=quiet?'камера не запущена — «Старт»':(err.name+': '+err.message); }
+  }catch(err){ l.stream=null; l.camErr=quiet?L('камера не запущена — «Старт»','camera not started — “Start”'):(err.name+': '+err.message); }
   refreshFiles(true);
 }
 function stopCam(l){ if(l.stream){ l.stream.getTracks().forEach(t=>t.stop()); l.stream=null; }
@@ -630,7 +712,7 @@ let camList=[];
 async function listCams(){ try{ camList=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'); }catch(err){} }
 const videoLayer=()=>layers.find(l=>l.kind==='video');
 function addVideoLayer(camId){ /* the single camera layer, created on first «Старт» */
-  const l=addLayer(); l.kind='video'; l.name='Видео'; l.side='any'; l.vmode='overlay'; l.fe=.15; l.camId=camId||'';
+  const l=addLayer(); l.kind='video'; l.name=L('Видео','Video'); l.side='any'; l.vmode='overlay'; l.fe=.15; l.camId=camId||'';
   attachVideo(l); layersChanged(); startCam(l); return l;
 }
 function snapLayer(l){ /* freeze the current frame into a new image layer at the same place */
@@ -638,9 +720,9 @@ function snapLayer(l){ /* freeze the current frame into a new image layer at the
   const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
   c.getContext('2d').drawImage(v,0,0);
   c.toBlob(b=>{ if(!b) return;
-    const n=addLayer(), keep=['x','y','rot','scale','fh','fv','side','H','crop','fe'];
+    const n=addLayer(), keep=['x','y','rot','scale','sx','sy','fh','fv','side','H','crop','fe'];
     keep.forEach(k=>n[k]=JSON.parse(JSON.stringify(l[k]??null))); n.cor={...l.cor};
-    n.name='Снимок '+new Date().toLocaleTimeString('ru-RU');
+    n.name=L('Снимок ','Snapshot ')+new Date().toLocaleTimeString(LOC);
     storeFile(n.id,new File([b],'micro_'+Date.now()+'.png',{type:'image/png'}));
     layersChanged();
   },'image/png');
@@ -649,14 +731,14 @@ function mainOf(side){ return layers.find(x=>x.main&&x.side===side&&x.kind!=='vi
 function snapPatch(l){ /* «Дополнить слой»: frame -> image layer at the same place, sub-layer of the main layer
                           of the side being viewed (TOP main / BOT main) */
   const side=boardSide, M=mainOf(side);
-  if(!M){ l.camErr='нет главного слоя — поставьте метку «'+side.toUpperCase()+' main»'; renderVideo(); return; }
+  if(!M){ l.camErr=L('нет главного слоя — поставьте метку «'+side.toUpperCase()+' main»','no main layer — tag a layer “'+side.toUpperCase()+' main”'); renderVideo(); return; }
   const v=l.vid; if(!v||!v.videoWidth) return;
   const c=document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
   c.getContext('2d').drawImage(v,0,0);
   c.toBlob(b=>{ if(!b) return;
-    const n=addLayer(), keep=['x','y','rot','scale','fh','fv','H','crop','fe'];
+    const n=addLayer(), keep=['x','y','rot','scale','sx','sy','fh','fv','H','crop','fe'];
     keep.forEach(k=>n[k]=JSON.parse(JSON.stringify(l[k]??null))); n.cor={...l.cor};
-    n.side=M.side; n.parent=M.id; n.name='патч '+new Date().toLocaleTimeString('ru-RU');
+    n.side=M.side; n.parent=M.id; n.name=L('патч ','patch ')+new Date().toLocaleTimeString(LOC);
     storeFile(n.id,new File([b],'patch_'+Date.now()+'.png',{type:'image/png'}));
     l.camErr=''; layersChanged();
   },'image/png');
@@ -675,15 +757,17 @@ function removeLayer(l){
 }
 
 /* ---------- geometry ---------- */
+/* layer scale along its image axes: uniform scale × per-axis stretch (side handles in mode M) × mirror */
+const kX=l=>l.scale*(l.sx||1)*(l.fh?-1:1), kY=l=>l.scale*(l.sy||1)*(l.fv?-1:1);
 function T(l,p){
-  const dx=(p.x-l.w/2)*l.scale*(l.fh?-1:1), dy=(p.y-l.h/2)*l.scale*(l.fv?-1:1);
+  const dx=(p.x-l.w/2)*kX(l), dy=(p.y-l.h/2)*kY(l);
   const r=l.rot*Math.PI/180, c=Math.cos(r), s=Math.sin(r);
   return {x:dx*c-dy*s+l.x, y:dx*s+dy*c+l.y};
 }
 function Tinv(l,m){
   const r=-l.rot*Math.PI/180, c=Math.cos(r), s=Math.sin(r);
   const ax=m.x-l.x, ay=m.y-l.y, dx=ax*c-ay*s, dy=ax*s+ay*c;
-  return {x:dx/(l.scale*(l.fh?-1:1))+l.w/2, y:dy/(l.scale*(l.fv?-1:1))+l.h/2};
+  return {x:dx/kX(l)+l.w/2, y:dy/kY(l)+l.h/2};
 }
 function applyH(H,p){const d=H[6]*p.x+H[7]*p.y+1;
   return {x:(H[0]*p.x+H[1]*p.y+H[2])/d, y:(H[3]*p.x+H[4]*p.y+H[5])/d};}
@@ -726,19 +810,19 @@ function fitTransform(src,dst,opt){
       src.forEach((p,i)=>{ rows.push([p.x, p.y,1,0]); rhs.push(dst[i].x);
                            rows.push([-p.y,p.x,0,1]); rhs.push(dst[i].y); });
       const s=normal(rows,rhs,4); if(!s)return null;
-      return {H:[s[0],s[1],s[2],s[1],-s[0],s[3],0,0], model:'подобие (зерк.)'};
+      return {H:[s[0],s[1],s[2],s[1],-s[0],s[3],0,0], model:L('подобие (зерк.)','similarity (mirr.)')};
     }
     src.forEach((p,i)=>{ rows.push([p.x,-p.y,1,0]); rhs.push(dst[i].x);
                          rows.push([p.y, p.x,0,1]); rhs.push(dst[i].y); });
     const s=normal(rows,rhs,4); if(!s)return null;
-    return {H:[s[0],-s[1],s[2],s[1],s[0],s[3],0,0], model:'подобие'};
+    return {H:[s[0],-s[1],s[2],s[1],s[0],s[3],0,0], model:L('подобие','similarity')};
   }
   if(n===3 || opt.model!=='persp'){
     const rows=[],rhs=[];
     src.forEach((p,i)=>{ rows.push([p.x,p.y,1,0,0,0]); rhs.push(dst[i].x);
                          rows.push([0,0,0,p.x,p.y,1]); rhs.push(dst[i].y); });
     const s=normal(rows,rhs,6); if(!s)return null;
-    return {H:[s[0],s[1],s[2],s[3],s[4],s[5],0,0], model:'аффинная'};
+    return {H:[s[0],s[1],s[2],s[3],s[4],s[5],0,0], model:L('аффинная','affine')};
   }
   const nrm=pts=>{ const c={x:0,y:0}; pts.forEach(p=>{c.x+=p.x/pts.length;c.y+=p.y/pts.length});
     let d=0; pts.forEach(p=>d+=Math.hypot(p.x-c.x,p.y-c.y)/pts.length); d=d||1;
@@ -753,7 +837,7 @@ function fitTransform(src,dst,opt){
   const Ti=[[1/D.s,0,D.c.x],[0,1/D.s,D.c.y],[0,0,1]];
   const mul=(X,Y)=>X.map(r=>Y[0].map((_,j)=>r.reduce((s,v,k)=>s+v*Y[k][j],0)));
   const M=mul(Ti,mul(Hn,Ts)), k=M[2][2];
-  return {H:[M[0][0]/k,M[0][1]/k,M[0][2]/k,M[1][0]/k,M[1][1]/k,M[1][2]/k,M[2][0]/k,M[2][1]/k], model:'перспектива'};
+  return {H:[M[0][0]/k,M[0][1]/k,M[0][2]/k,M[1][0]/k,M[1][1]/k,M[1][2]/k,M[2][0]/k,M[2][1]/k], model:L('перспектива','perspective')};
 }
 
 /* ---------- render ---------- */
@@ -806,7 +890,7 @@ function applyLayer(l){
     l.box.style.transform=`matrix3d(${H[0]},${H[3]},0,${H[6]},${H[1]},${H[4]},0,${H[7]},0,0,1,0,${H[2]},${H[5]},0,1)`;
   }else{
     l.box.style.transformOrigin='50% 50%';
-    l.box.style.transform=`translate(-50%,-50%) translate(${l.x}px,${l.y}px) rotate(${l.rot}deg) scale(${l.scale*(l.fh?-1:1)},${l.scale*(l.fv?-1:1)})`;
+    l.box.style.transform=`translate(-50%,-50%) translate(${l.x}px,${l.y}px) rotate(${l.rot}deg) scale(${kX(l)},${kY(l)})`;
   }
   const cr=l.crop;
   l.el.style.clipPath = cr ? `inset(${cr.y0}px ${l.w-cr.x1}px ${l.h-cr.y1}px ${cr.x0}px)` : 'none';
@@ -842,7 +926,7 @@ function applyView(){
   drawMarks(); save();
 }
 function updateBlink(){
-  const target=(blinkOn&&clickMode==='align') ? (pending? sel : refId) : null;
+  const target=(blinkOn&&clickMode==='align') ? (pending? refId : sel) : null;
   layers.forEach(l=>l.box.classList.toggle('blink',l.id===target&&l.on));
 }
 const vrad=()=>view.rot*Math.PI/180;
@@ -885,7 +969,7 @@ function drawMarks(){
     const n=svg('text',{x:pa.x+5,y:pa.y-4,fill:'#000','font-size':9,
       'font-family':'IBM Plex Mono, monospace',opacity:.55}); n.textContent=String(i+1); marks.appendChild(n);
   });
-  if(pending&&byId(refId)) cross(screenOf(worldOf(byId(refId),pending)),6,.8);
+  if(pending&&sel_()) cross(screenOf(worldOf(sel_(),pending)),6,.8);   /* pending = point on the active layer */
   if(showNets) points.forEach(pt=>{
     const net=nets.find(n=>n.id===pt.net), lay=byId(pt.layer);
     if(!net||!net.on||!lay||!ptShown(pt,lay)) return;
@@ -927,7 +1011,9 @@ const evXY=e=>{ const r=vp.getBoundingClientRect(); return {x:e.clientX-r.left,y
 function inLayer(l,e){ const p=imgOf(l,worldFromEvent(e)); return p.x>=0&&p.y>=0&&p.x<=l.w&&p.y<=l.h; }
 function layerBox(l){
   const q=[{x:0,y:0},{x:l.w,y:0},{x:l.w,y:l.h},{x:0,y:l.h}].map(p=>screenOf(worldOf(l,p)));
-  return {q, P:screenOf(worldOf(l,pivotImg(l)))};
+  const e=[['sy',{x:l.w/2,y:0}],['sx',{x:l.w,y:l.h/2}],['sy',{x:l.w/2,y:l.h}],['sx',{x:0,y:l.h/2}]]   /* side midpoints */
+    .map(([a,p])=>({a,p:screenOf(worldOf(l,p))}));
+  return {q, e, P:screenOf(worldOf(l,pivotImg(l)))};
 }
 function drawPivot(P){
   const g=(a)=>marks.appendChild(svg(a[0],a[1]));
@@ -942,18 +1028,20 @@ function frame(q,dash){ const pts=q.map(p=>p.x+','+p.y).join(' ');
 function drawLayerBox(){
   const l=sel_(); if(!l||l.H) return;
   const b=layerBox(l); frame(b.q);
-  if(xfMode==='scale')
+  if(xfMode==='scale'){
     b.q.forEach(p=>marks.appendChild(svg('rect',{x:p.x-5,y:p.y-5,width:10,height:10,fill:'#fff',stroke:'#000','stroke-width':1})));
+    b.e.forEach(({p})=>marks.appendChild(svg('rect',{x:p.x-4,y:p.y-4,width:8,height:8,fill:'#fff',stroke:'#000','stroke-width':1}))); }
   else b.q.forEach(p=>{ /* curved-arrow rotation handles at the corners */
     const t=svg('text',{x:p.x,y:p.y,fill:'#fff',stroke:'#000','stroke-width':3,'paint-order':'stroke','font-size':18,
       'font-weight':700,'text-anchor':'middle','dominant-baseline':'central'}); t.textContent='↻'; marks.appendChild(t); });
   drawPivot(b.P);
 }
-function hitLayerBox(e){ /* -> 'piv' | 'scale' | 'rot' | 'in' | null */
+function hitLayerBox(e){ /* -> 'piv' | 'scale' | 'sx' | 'sy' | 'rot' | 'in' | null */
   const l=sel_(); if(!l||l.H) return null;
   const m=evXY(e), b=layerBox(l);
   if(Math.hypot(m.x-b.P.x,m.y-b.P.y)<=9) return 'piv';
   if(b.q.some(p=>Math.hypot(m.x-p.x,m.y-p.y)<=10)) return xfMode==='scale'?'scale':'rot';
+  if(xfMode==='scale'){ const h=b.e.find(({p})=>Math.hypot(m.x-p.x,m.y-p.y)<=9); if(h) return h.a; }
   return inLayer(l,e)?'in':null;
 }
 /* crop mode: rectangle in image px of the active layer (works on warped layers too) */
@@ -1043,7 +1131,7 @@ function drawComps(){
     const p=screenOf(g.centre);
     const t=svg('text',{x:p.x,y:p.y-6,fill:'#e8b04b','font-size':11,'text-anchor':'middle',
       'font-family':'IBM Plex Mono, monospace'});
-    t.textContent='эталон '+calib.size+(calib.rot?' · '+calib.rot+'°':''); marks.appendChild(t);
+    t.textContent=L('эталон ','gauge ')+calib.size+(calib.rot?' · '+calib.rot+'°':''); marks.appendChild(t);
   }
 }
 function hitComp(m){
@@ -1103,7 +1191,7 @@ function renderComps(){
   const box=$('complist'); box.innerHTML='';
   const list=comps.filter(c=>showSide[c.side]);
   if(!list.length){ const d=document.createElement('div'); d.className='empty';
-    d.textContent=comps.length?'Скрыты фильтром.':'Компонентов нет.'; box.appendChild(d); }
+    d.textContent=comps.length?L('Скрыты фильтром.','Hidden by filter.'):L('Компонентов нет.','No components.'); box.appendChild(d); }
   list.forEach(c=>{
     const row=document.createElement('div'); row.className='crow'+(c.id===selComp?' sel':'');
     const sw=document.createElement('span'); sw.className='swatch'; sw.style.height='14px';
@@ -1127,7 +1215,7 @@ function renderProps(){
   const box=$('compProps'); box.innerHTML='';
   const c=comps.find(o=>o.id===selComp);
   if(!c){ const d=document.createElement('div'); d.className='empty';
-    d.textContent='Компонент не выбран.'; box.appendChild(d); return; }
+    d.textContent=L('Компонент не выбран.','No component selected.'); box.appendChild(d); return; }
   const mkRow=(label,node)=>{ const r=document.createElement('div'); r.className='row';
     const l=document.createElement('span'); l.className='lbl'; l.textContent=label;
     r.append(l,node); box.appendChild(r); return r; };
@@ -1140,20 +1228,20 @@ function renderProps(){
   const sz=document.createElement('select'); sz.className='slim';
   Object.keys(PKG).forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sz.appendChild(o)});
   sz.value=c.size; sz.onchange=()=>{c.size=sz.value;if(autoPins(c))renderProps();renderComps0();drawMarks();save()};
-  mkRow('корпус',sz);
+  mkRow(L('корпус','package'),sz);
   const sd=document.createElement('select'); sd.className='slim';
   [['top','top-comp'],['bot','bot-comp']].forEach(([v,t])=>{const o=document.createElement('option');
     o.value=v;o.textContent=t;sd.appendChild(o)});
   sd.value=c.side; sd.onchange=()=>{c.side=sd.value;renderComps();drawMarks();save()};
-  mkRow('сторона',sd);
+  mkRow(L('сторона','side'),sd);
   const rot=document.createElement('div'); rot.className='row'; rot.style.flex='1';
   const rl=document.createElement('button'); rl.className='mini'; rl.textContent='↺45';
   const rr=document.createElement('button'); rr.className='mini'; rr.textContent='↻45';
   const rv=document.createElement('span'); rv.className='val'; rv.textContent=(c.rot||0)+'°';
   rl.onclick=()=>{rotateComp(-45);rv.textContent=(c.rot||0)+'°'};
   rr.onclick=()=>{rotateComp(45);rv.textContent=(c.rot||0)+'°'};
-  rot.append(rl,rr,rv); mkRow('угол',rot);
-  [['вывод 1','n1'],['вывод 2','n2']].forEach(([lab,key])=>{
+  rot.append(rl,rr,rv); mkRow(L('угол','angle'),rot);
+  [[L('вывод 1','pin 1'),'n1'],[L('вывод 2','pin 2'),'n2']].forEach(([lab,key])=>{
     const s2=document.createElement('select'); s2.className='slim';
     const o0=document.createElement('option'); o0.value=''; o0.textContent='—'; s2.appendChild(o0);
     nets.forEach(n=>{const o=document.createElement('option');o.value=n.id;o.textContent=n.name;s2.appendChild(o)});
@@ -1161,13 +1249,13 @@ function renderProps(){
     s2.onchange=()=>{c[key]=s2.value||null;drawMarks();save()};
     mkRow(lab,s2);
   });
-  const del=document.createElement('button'); del.className='mini wide'; del.textContent='Удалить компонент';
+  const del=document.createElement('button'); del.className='mini wide'; del.textContent=L('Удалить компонент','Delete component');
   del.onclick=()=>{comps=comps.filter(o=>o.id!==c.id);selComp=null;renderComps();drawMarks();save()};
   box.appendChild(del);
   if(clickMode!=='comp'){ /* view only outside the edit mode */
     box.querySelectorAll('input,select,button').forEach(n=>n.disabled=true);
     const h=document.createElement('div'); h.className='empty';
-    h.textContent='Правка — в режиме «Редактирование компонентов» (K).'; box.appendChild(h); }
+    h.textContent=L('Правка — в режиме «Редактирование компонентов» (K).','Editing — in “Edit components” mode (K).'); box.appendChild(h); }
 }
 function renderComps0(){ /* list refresh without rebuilding props (keeps focus) */
   const box=$('complist');
@@ -1194,38 +1282,43 @@ function syncComps(){
   $('compSize').value=compSize; $('compSide').value=compSide;
   $('compPick').disabled=!mmScale;
   $('compPick').classList.toggle('on',clickMode==='comp');
-  $('compPick').textContent='Редактирование компонентов (K)';
+  $('compPick').textContent=L('Редактирование компонентов (K)','Edit components (K)');
   $('calBtn').classList.toggle('on',clickMode==='calib');
-  $('calBtn').textContent=clickMode==='calib'?'Идёт калибровка':'Калибровать';
+  $('calBtn').textContent=clickMode==='calib'?L('Идёт калибровка','Calibrating…'):L('Калибровать','Calibrate');
   $('calDone').disabled=clickMode!=='calib';
   $('calRange').disabled=!calib&&!mmScale;
   $('calVal').textContent=mmScale?mmScale.toFixed(1):'—';
   if(mmScale) $('calRange').value=scaleToSlider(mmScale);
   const g=PKG[calib?calib.size:$('calSize').value];
   $('calStatus').innerHTML = mmScale
-    ? `1 мм = <b>${mmScale.toFixed(1)}</b> px изображения.<br>`+
+    ? L(`1 мм = <b>${mmScale.toFixed(1)}</b> px изображения.<br>`,`1 mm = <b>${mmScale.toFixed(1)}</b> image px.<br>`)+
       (clickMode==='calib'
-        ? `Двигайте эталон ${calib?calib.size:''} (${g.L}×${g.W} мм), ползунком подгоните размер, Space — поворот, затем «Готово».`
-        : 'Компоненты ставятся в этом масштабе.')
+        ? L(`Двигайте эталон ${calib?calib.size:''} (${g.L}×${g.W} мм), ползунком подгоните размер, Space — поворот, затем «Готово».`,
+            `Move the ${calib?calib.size:''} gauge (${g.L}×${g.W} mm), fit its size with the slider, Space — rotate, then “Done”.`)
+        : L('Компоненты ставятся в этом масштабе.','Components are placed at this scale.'))
     : (clickMode==='calib'
-        ? `Кликните по плате — появится эталон ${$('calSize').value} (${g.L}×${g.W} мм), подгоните его ползунком.`
-        : '<span class="bad">Масштаб не задан.</span> Нажмите «Калибровать».');
-  $('compStatus').innerHTML = !mmScale ? 'Сначала калибровка масштаба.'
+        ? L(`Кликните по плате — появится эталон ${$('calSize').value} (${g.L}×${g.W} мм), подгоните его ползунком.`,
+            `Click the board — a ${$('calSize').value} gauge appears (${g.L}×${g.W} mm); fit it with the slider.`)
+        : L('<span class="bad">Масштаб не задан.</span> Нажмите «Калибровать».','<span class="bad">Scale not set.</span> Press “Calibrate”.'));
+  $('compStatus').innerHTML = !mmScale ? L('Сначала калибровка масштаба.','Calibrate the scale first.')
     : (clickMode==='comp'
-       ? `Клик по плате ставит <b>${compKind}${compSeq[compKind]}</b> · ${compSize} · ${compSide}-comp · ${compRot}°.`
-       : 'Клик по компоненту — выбрать, перетаскивание — двигать, Space — поворот на 45°.')       + (clickMode==='move'||clickMode==='crop' ? '<br><b>Режим правки слоя</b> — компоненты сейчас не ловятся.' : '');
+       ? L(`Клик по плате ставит <b>${compKind}${compSeq[compKind]}</b> · ${compSize} · ${compSide}-comp · ${compRot}°.`,
+           `A click on the board places <b>${compKind}${compSeq[compKind]}</b> · ${compSize} · ${compSide}-comp · ${compRot}°.`)
+       : L('Клик по компоненту — выбрать, перетаскивание — двигать, Space — поворот на 45°.','Click a component — select, drag — move, Space — rotate 45°.'))
+       + (clickMode==='move'||clickMode==='crop' ? L('<br><b>Режим правки слоя</b> — компоненты сейчас не ловятся.','<br><b>Layer edit mode</b> — components are not picked now.') : '');
 }
 /* ---------- layer cards ---------- */
-const TINTS=[['color','цвет','цвет (сохраняет яркость)'],['multiply','умн','умножение'],
-  ['screen','осв','осветление'],['hue','тон','тон'],['normal','залив','заливка']];
-const BLENDS_SHORT={normal:'норм',difference:'разн',screen:'осв',multiply:'умн',exclusion:'искл'};
-const BLENDS=[['normal','обычное'],['difference','разность'],['screen','осветление'],
-              ['multiply','умножение'],['exclusion','исключение']];
+const TINTS=[['color',L('цвет','color'),L('цвет (сохраняет яркость)','color (keeps luminance)')],['multiply',L('умн','mult'),L('умножение','multiply')],
+  ['screen',L('осв','scrn'),L('осветление','screen')],['hue',L('тон','hue'),L('тон','hue')],['normal',L('залив','fill'),L('заливка','fill')]];
+const BLENDS_SHORT=LANG==='ru'?{normal:'норм',difference:'разн',screen:'осв',multiply:'умн',exclusion:'искл'}
+                              :{normal:'norm',difference:'diff',screen:'scrn',multiply:'mult',exclusion:'excl'};
+const BLENDS=[['normal',L('обычное','normal')],['difference',L('разность','difference')],['screen',L('осветление','screen')],
+              ['multiply',L('умножение','multiply')],['exclusion',L('исключение','exclusion')]];
 /* side label selector; "TOP main"/"BOT main" = main layer of that side (one per side); microscope snapshots
    become its sub-layers (l.parent). Changing a sub-layer to another side detaches it. */
 function sideSel(l){
-  const x=document.createElement('select'); x.className='slim tagsel'; x.title='сторона (метка) слоя; main — главный слой стороны';
-  [['any','обе'],['top','TOP'],['bot','BOT'],['top-main','TOP main'],['bot-main','BOT main']].forEach(([v,t])=>{
+  const x=document.createElement('select'); x.className='slim tagsel'; x.title=L('сторона (метка) слоя; main — главный слой стороны','layer side (tag); main — the main layer of the side');
+  [['any',L('обе','both')],['top','TOP'],['bot','BOT'],['top-main','TOP main'],['bot-main','BOT main']].forEach(([v,t])=>{
     const o=document.createElement('option'); o.value=v; o.textContent=t; x.appendChild(o); });
   x.value=(l.side||'any')+(l.main&&l.side!=='any'?'-main':'');
   x.onchange=()=>{ const [sd,m]=x.value.split('-'); l.side=sd; l.main=!!m;
@@ -1242,7 +1335,7 @@ function renderCards(){
   [...layers].reverse().forEach(l=>{ if(l.kind==='video') return;   /* video layer lives in the ВИДЕО tab */
     const i=idx(l.id);
     if(grp(l)!==lastG){ lastG=grp(l); const sp=document.createElement('div'); sp.className='lsep';
-      sp.textContent=['обе','BOT','TOP'][lastG]; box.appendChild(sp); }
+      sp.textContent=[L('обе','both'),'BOT','TOP'][lastG]; box.appendChild(sp); }
     const card=document.createElement('div');
     card.className='layer'+(parentOf(l)?' sub':'')+(l.id===sel?' sel':'')+
       ((l.on && onSide(l))?'':' off');
@@ -1253,42 +1346,42 @@ function renderCards(){
     card.onclick=pick;
     const sw=document.createElement('div'); sw.className='swatch'; sw.style.background=l.tc; sw.dataset.lid=l.id;
     const nm=document.createElement('input'); nm.type='text'; nm.className='lname'; nm.value=l.name; nm.spellcheck=false;
-    nm.title='имя слоя'; nm.oninput=()=>{ l.name=nm.value; l.el.alt=nm.value; sync(); save(); };
+    nm.title=L('имя слоя','layer name'); nm.oninput=()=>{ l.name=nm.value; l.el.alt=nm.value; sync(); save(); };
     nm.onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape') nm.blur(); };
     nm.onchange=()=>renderCards();
-    const sl=document.createElement('span'); sl.className='lbl tag'; sl.textContent='сторона';
+    const sl=document.createElement('span'); sl.className='lbl tag'; sl.textContent=L('сторона','side');
     const sSel=sideSel(l);
-    const up=document.createElement('button'); up.className='ibtn'; up.textContent='▲'; up.title='выше';
+    const up=document.createElement('button'); up.className='ibtn'; up.textContent='▲'; up.title=L('выше','up');
     const peers=layers.filter(o=>o.kind!=='video'&&grp(o)===grp(l)&&(parentOf(l)?o.parent===l.parent:!parentOf(o))), pi=peers.indexOf(l);
     const swap=o=>{ const a=layers.indexOf(l), b=layers.indexOf(o); layers[a]=o; layers[b]=l;
       restack(); renderCards(); renderFiles(); applyAll(); save(); };
     up.disabled=pi>=peers.length-1;
     up.onclick=()=>swap(peers[pi+1]);
-    const dn=document.createElement('button'); dn.className='ibtn'; dn.textContent='▼'; dn.title='ниже';
+    const dn=document.createElement('button'); dn.className='ibtn'; dn.textContent='▼'; dn.title=L('ниже','down');
     dn.disabled=pi<=0;
     dn.onclick=()=>swap(peers[pi-1]);
     const eye=document.createElement('button'); eye.className='ibtn'; eye.textContent=l.on?'●':'○';
-    eye.title='видимость';
+    eye.title=L('видимость','visibility');
     eye.onclick=()=>{l.on=!l.on;renderCards();applyAll();sync()};
-    const del=document.createElement('button'); del.className='ibtn'; del.textContent='✕'; del.title='удалить слой';
+    const del=document.createElement('button'); del.className='ibtn'; del.textContent='✕'; del.title=L('удалить слой','delete layer');
     del.disabled=layers.filter(o=>o.kind!=='video').length<=1;
     del.onclick=()=>{ const np=points.filter(p=>p.layer===l.id).length;
-      if(confirm('Удалить слой «'+l.name+'»'+(np?' и его точки NET ('+np+')':'')+'?')) removeLayer(l); };
+      if(confirm(L('Удалить слой «'+l.name+'»'+(np?' и его точки NET ('+np+')':'')+'?','Delete layer “'+l.name+'”'+(np?' and its NET points ('+np+')':'')+'?'))) removeLayer(l); };
     head.append(sw,nm,sl,sSel,up,dn,eye,del);
 
     const body=document.createElement('div'); body.className='lbody';
     if(!l.ok){ /* image missing: the only place to pick a file now */
       const rm=document.createElement('div'); rm.className='row';
       const tx=document.createElement('span'); tx.className='bad'; tx.style.flex='1'; tx.style.fontSize='11px';
-      tx.textContent=(l.src||l.stored)?'не загружен: '+baseName(l.src):'картинка не задана';
-      const bf=document.createElement('button'); bf.className='mini'; bf.textContent='Выбрать файл…';
-      bf.title='картинка с диска; оригинал хранится в браузере и в проекте'; bf.onclick=()=>{ browseTarget=l.id; $('fileImg').click(); };
+      tx.textContent=(l.src||l.stored)?L('не загружен: ','not loaded: ')+baseName(l.src):L('картинка не задана','no image');
+      const bf=document.createElement('button'); bf.className='mini'; bf.textContent=L('Выбрать файл…','Choose file…');
+      bf.title=L('картинка с диска; оригинал хранится в браузере и в проекте','image from disk; the original is kept in the browser and in the project'); bf.onclick=()=>{ browseTarget=l.id; $('fileImg').click(); };
       rm.append(tx,bf); body.appendChild(rm); }
     card.append(head); if(body.childNodes.length) card.appendChild(body); box.appendChild(card);
   });
   const rs=$('refSel'); rs.innerHTML='';
   layers.forEach(l=>{ const o=document.createElement('option'); o.value=l.id;
-    o.textContent=l.name+(l.id===sel?' (активный)':''); rs.appendChild(o); });
+    o.textContent=l.name+(l.id===sel?L(' (активный)',' (active)'):''); rs.appendChild(o); });
   rs.value=refId||'';
 }
 function refreshFiles(force){ /* image status changed; don't rebuild cards under a focused name field */
@@ -1309,46 +1402,48 @@ function renderVideo(){
   const grid=(cls,...b)=>{ const d=document.createElement('div'); d.className='modes'+(cls?' '+cls:''); b.forEach(x=>d.appendChild(x)); return d; };
   /* camera + visibility */
   const top=document.createElement('div'); top.className='row';
-  const cs=document.createElement('select'); cs.className='slim'; cs.title='камера';
-  const opts=camList.length?camList:[{deviceId:(l&&l.camId)||'',label:'камера'}];
-  opts.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||('камера '+(i+1)); cs.appendChild(o); });
+  const cs=document.createElement('select'); cs.className='slim'; cs.title=L('камера','camera');
+  const opts=camList.length?camList:[{deviceId:(l&&l.camId)||'',label:L('камера','camera')}];
+  opts.forEach((d,i)=>{ const o=document.createElement('option'); o.value=d.deviceId; o.textContent=d.label||(L('камера ','camera ')+(i+1)); cs.appendChild(o); });
   cs.value=(l&&l.camId)||''; cs.onchange=()=>{ if(l){ l.camId=cs.value; startCam(l); } else addVideoLayer(cs.value); };
   top.appendChild(cs);
-  if(l){ const eye=btn(l.on?'●':'○','видимость',()=>{ l.on=!l.on; renderVideo(); applyAll(); sync(); },'ibtn'); eye.className='ibtn'; top.appendChild(eye); }
+  if(l){ const eye=btn(l.on?'●':'○',L('видимость','visibility'),()=>{ l.on=!l.on; renderVideo(); applyAll(); sync(); },'ibtn'); eye.className='ibtn'; top.appendChild(eye); }
   const st=document.createElement('div'); st.className='status';
-  st.innerHTML = live ? `<span class="good">видео идёт</span> · ${v.videoWidth}×${v.videoHeight}`
-    : '<span class="bad">'+((l&&l.camErr)||'камера остановлена')+'</span>';
+  st.innerHTML = live ? `<span class="good">${L('видео идёт','video running')}</span> · ${v.videoWidth}×${v.videoHeight}`
+    : '<span class="bad">'+((l&&l.camErr)||L('камера остановлена','camera stopped'))+'</span>';
   add(top,st);
   const ctl=grid('two',
-    btn(live?'Стоп':'Старт','',()=>{ if(!l) addVideoLayer(cs.value); else if(l.stream){ stopCam(l); renderVideo(); } else startCam(l); }),
-    btn('обновить список','заново найти камеры',async()=>{ await listCams(); renderVideo(); }));
+    btn(live?L('Стоп','Stop'):L('Старт','Start'),'',()=>{ if(!l) addVideoLayer(cs.value); else if(l.stream){ stopCam(l); renderVideo(); } else startCam(l); }),
+    btn(L('обновить список','refresh list'),L('заново найти камеры','re-scan cameras'),async()=>{ await listCams(); renderVideo(); }));
   if(!l){ add(ctl); box.appendChild(row); syncVidWin(); return; }
   if(l.side!=='any'){ l.side='any'; restack(); }
   const win=l.vmode==='window';
   const vm=grid('two',
-    btn('наложение','видео поверх платы, совмещается ручной деформацией',()=>setVmode(l,'overlay'),win?'':'on'),
-    btn('окно','видео внизу этой вкладки, на плате скрыто',()=>setVmode(l,'window'),win?'on':''));
+    btn(L('наложение','overlay'),L('видео поверх платы, совмещается ручной деформацией','video over the board, aligned with free transform'),()=>setVmode(l,'overlay'),win?'':'on'),
+    btn(L('окно','window'),L('видео внизу этой вкладки, на плате скрыто','video at the bottom of this tab, hidden on the board'),()=>setVmode(l,'window'),win?'on':''));
   const sl=(lab,val,max,tt,fn)=>{ const r=document.createElement('div'); r.className='row'; r.title=tt;
     const a=document.createElement('span'); a.className='lbl'; a.style.flex='none'; a.style.width='40px'; a.textContent=lab;
     if(lab==='α'){ a.style.textTransform='none'; a.style.fontSize='12px'; }
     const i=document.createElement('input'); i.type='range'; i.min=0; i.max=max; i.value=val;
     const vv=document.createElement('span'); vv.className='val'; vv.textContent=val+'%';
     i.oninput=()=>{ vv.textContent=i.value+'%'; fn(+i.value); }; r.append(a,i,vv); return r; };
-  const ra=sl('α',Math.round(l.op*100),100,'непрозрачность видео',x=>{ l.op=x/100; applyLayer(l); });
-  const rf=sl('края',Math.round((l.fe||0)*100),50,'размытие краёв кадра (участок задаёт кроп); переходит в снимок',
+  const ra=sl('α',Math.round(l.op*100),100,L('непрозрачность видео','video opacity'),x=>{ l.op=x/100; applyLayer(l); });
+  const rf=sl(L('края','edges'),Math.round((l.fe||0)*100),50,L('размытие краёв кадра (участок задаёт кроп); переходит в снимок','frame edge feathering (area set by the crop); carried into the snapshot'),
     x=>{ l.fe=x/100; applyLayer(l); sync(); });
-  const fl=grid('',...[['⇄','fh','отразить по горизонтали'],['⇅','fv','отразить по вертикали'],['↺',-90,'повернуть −90°'],['↻',90,'повернуть +90°']]
+  const fl=grid('',...[['⇄','fh',L('отразить по горизонтали','mirror horizontally')],['⇅','fv',L('отразить по вертикали','mirror vertically')],['↺',-90,L('повернуть −90°','rotate −90°')],['↻',90,L('повернуть +90°','rotate +90°')]]
     .map(([tx,a,tt])=>btn(tx,tt,()=>{ if(l.H){l.H=null;warpInfo='';}
       if(typeof a==='string') l[a]=!l[a]; else { l.rot=Math.round((l.rot+a)*10)/10; if(l.rot>180)l.rot-=360; if(l.rot<-180)l.rot+=360; }
       applyLayer(l); renderVideo(); sync(); },l[a]===true?'on':'')));
   if(win) fl.querySelectorAll('button').forEach(b=>b.disabled=true);   /* they act on the overlay only */
-  const md=grid('two',...[['move','Ручная деформация (M)','рамка: масштаб / вращение (клик по слою переключает), ⊕ — центр'],
-     ['crop','Кроп','участок кадра для снимка; края размываются внутри кропа']].map(([m,tx,tt])=>{
+  const md=grid('two',...[['move',L('Ручная деформация (M)','Free transform (M)'),L('рамка: масштаб / вращение (клик по слою переключает), ⊕ — центр','frame: scale / rotate (click the layer to toggle), ⊕ — pivot')],
+     ['crop',L('Кроп','Crop'),L('участок кадра для снимка; края размываются внутри кропа','frame area for the snapshot; edges feather inside the crop')]].map(([m,tx,tt])=>{
       const b=btn(tx,tt,()=>videoMode(l,m),clickMode===m&&sel===l.id?'on':''); b.dataset.mode=m; b.dataset.lid=l.id;
       b.disabled=win||(m==='move'&&!!l.H); return b; }));
-  const M=mainOf(boardSide), sn=btn('Дополнить слой','',()=>snapPatch(l),'wide');
-  sn.title=M?'кадр — подслоем «'+M.name+'» ('+boardSide.toUpperCase()+' main, сторона в просмотре)'
-            :'нет главного слоя стороны в просмотре — метка «'+boardSide.toUpperCase()+' main» у слоя';
+  const M=mainOf(boardSide), sn=btn(L('Дополнить слой','Patch layer'),'',()=>snapPatch(l),'wide');
+  sn.title=M?L('кадр — подслоем «'+M.name+'» ('+boardSide.toUpperCase()+' main, сторона в просмотре)',
+                'frame → sub-layer of “'+M.name+'” ('+boardSide.toUpperCase()+' main, the side in view)')
+            :L('нет главного слоя стороны в просмотре — метка «'+boardSide.toUpperCase()+' main» у слоя',
+                'no main layer for the side in view — tag a layer “'+boardSide.toUpperCase()+' main”');
   sn.disabled=!live||!M;
   add(vm,ra,rf,fl,md,ctl,sn);
   box.appendChild(row); syncVidWin();
@@ -1367,12 +1462,12 @@ function syncVidWin(){ /* window mode: the same stream in a plain <video> at the
 function renderNets(){
   const box=$('netlist'); box.innerHTML='';
   if(!nets.length){ const d=document.createElement('div'); d.className='empty';
-    d.textContent='NET пока нет — нажмите «+ NET».'; box.appendChild(d); return; }
+    d.textContent=L('NET пока нет — нажмите «+ NET».','No NETs yet — press “+ NET”.'); box.appendChild(d); return; }
   nets.forEach(n=>{
     const row=document.createElement('div');
     row.className='net'+(n.id===activeNet?' active':'');
     const grip=document.createElement('span'); grip.className='grip'; grip.textContent=n.id===activeNet?'▶':'';
-    grip.title='выделить NET';
+    grip.title=L('выделить NET','select NET');
     const col=document.createElement('input'); col.type='color'; col.value=n.color;
     col.oninput=e=>{n.color=e.target.value;drawMarks();save()};
     col.onclick=e=>e.stopPropagation();
@@ -1428,9 +1523,11 @@ function recompute(report){
   let e=0; src.forEach((p,i)=>{const q=applyH(f.H,p); e+=(q.x-dst[i].x)**2+(q.y-dst[i].y)**2;});
   const det=f.H[0]*f.H[4]-f.H[1]*f.H[3];
   const flipped=(det<0)!==mirror;
-  warpInfo=`модель: ${f.model} · ${s.pairs.length} пар · RMS ${Math.sqrt(e/src.length).toFixed(1)} px`+
-    (flipped?`<br><span class="bad">Точки дают зеркальное соответствие относительно текущей ориентации слоя — `+
-      `проверьте порядок кликов (сначала опора, потом активный) или отражение ⇄/⇅ слоя.</span>`:'');
+  warpInfo=L(`модель: ${f.model} · ${s.pairs.length} пар`,`model: ${f.model} · ${s.pairs.length} pairs`)+` · RMS ${Math.sqrt(e/src.length).toFixed(1)} px`+
+    (flipped?'<br><span class="bad">'+L('Точки дают зеркальное соответствие относительно текущей ориентации слоя — '+
+      'проверьте порядок кликов (сначала активный, потом опора) или отражение ⇄/⇅ слоя.',
+      'The points give a mirrored match relative to the current layer orientation — '+
+      'check the click order (active layer first, then the reference) or the layer ⇄/⇅ mirroring.')+'</span>':'');
   s.box.style.transformOrigin='0 0';
   s.box.style.transform=`matrix3d(${f.H[0]},${f.H[3]},0,${f.H[6]},${f.H[1]},${f.H[4]},0,${f.H[7]},0,0,1,0,${f.H[2]},${f.H[5]},0,1)`;
   if(report)sync();
@@ -1454,40 +1551,48 @@ function sync(){
   $('rotv').disabled=$('sclv').disabled=warped||!s;
   if(document.activeElement!==$('rotv')) $('rotv').value=(warped||!s)?'—':String(+s.rot.toFixed(2));
   if(document.activeElement!==$('sclv')) $('sclv').value=(warped||!s)?'—':String(+s.scale.toFixed(4));
-  $('hudSel').textContent='плата '+boardSide.toUpperCase()+' · актив: '+(s?s.name:'—');
-  $('hudXf').textContent= !s?'' : warped?'деформация активна'
-    : `dx ${Math.round(s.x)} · dy ${Math.round(s.y)} · ${s.rot.toFixed(1)}° · ${s.scale.toFixed(3)}×`;
+  $('hudSel').textContent=L('плата ','board ')+boardSide.toUpperCase()+L(' · актив: ',' · active: ')+(s?s.name:'—');
+  $('hudXf').textContent= !s?'' : warped?L('деформация активна','warp active')
+    : `dx ${Math.round(s.x)} · dy ${Math.round(s.y)} · ${s.rot.toFixed(1)}° · ${s.scale.toFixed(3)}×`+
+      ((s.sx||1)!==1||(s.sy||1)!==1?` (x ${(s.sx||1).toFixed(3)} · y ${(s.sy||1).toFixed(3)})`:'');
   document.querySelectorAll('[data-vm]').forEach(b=>b.classList.toggle('on',b.dataset.vm===viewMode));
 
   const picking=clickMode==='align', np=s?s.pairs.length:0;
   $('applyWarp').disabled=np<2; $('undoPt').disabled=!np&&!pending;
   $('clearPts').disabled=!np&&!pending; $('dropWarp').disabled=!warped;
   $('pickBtn').classList.toggle('on',picking);
-  $('pickBtn').textContent=picking?'Завершить ввод':'Задать точки';
+  $('pickBtn').textContent=picking?L('Завершить ввод','Finish input'):L('Задать точки','Set points');
   $('blinkBtn').classList.toggle('on',blinkOn);
   $('warpModel').value=warpModel;
-  const nextName=pending?(s?s.name:'—'):(r?r.name:'—');
-  $('warpStatus').innerHTML=`Пар: <b>${np}</b>${np>=8?' (максимум)':''} · от 2 до 8.<br>`+
-    (picking?`Клик по слою <b>${nextName}</b> — ${pending?'та же точка':'опорная точка'}${blinkOn?' (мигает)':''}.`
-            :`Опора <b>${r?r.name:'—'}</b> → подгоняется <b>${s?s.name:'—'}</b>.`)+
+  const nextL=pending?r:s, nextName=nextL?nextL.name:'—', nextHidden=picking&&nextL&&!layerShown(nextL);
+  $('warpStatus').innerHTML=L(`Пар: <b>${np}</b>${np>=8?' (максимум)':''} · от 2 до 8.<br>`,`Pairs: <b>${np}</b>${np>=8?' (maximum)':''} · 2 to 8.<br>`)+
+    (picking?L(`Клик по слою <b>${nextName}</b> — ${pending?'та же точка на опоре':'точка на активном слое'}${blinkOn?' (мигает)':''}.`,
+               `Click layer <b>${nextName}</b> — ${pending?'the same point on the reference':'a point on the active layer'}${blinkOn?' (blinking)':''}.`)+
+       (nextHidden?'<br><span class="bad">'+L(`«${nextName}» сейчас не виден — включите XRAY или выберите видимую опору.`,
+                                              `“${nextName}” is not visible now — turn on XRAY or pick a visible reference.`)+'</span>':'')
+            :L(`Опора <b>${r?r.name:'—'}</b> → подгоняется <b>${s?s.name:'—'}</b>.`,`Reference <b>${r?r.name:'—'}</b> → fitting <b>${s?s.name:'—'}</b>.`))+
     (warpInfo&&warped?`<br><span class="good">${warpInfo}</span>`:'');
 
   const netting=clickMode==='net', an=nets.find(n=>n.id===activeNet);
   $('netPickBtn').classList.toggle('on',netting);
-  $('netPickBtn').textContent='Редактирование NET (N)';
+  $('netPickBtn').textContent=L('Редактирование NET (N)','Edit NETs (N)');
   $('delPoint').disabled=!netting||!selPoint; $('clearNetPts').disabled=!netting||!an||!points.some(p=>p.net===activeNet);
   if(compEditShown!==(clickMode==='comp')){ compEditShown=clickMode==='comp'; renderComps(); }
   $('labelsBtn').classList.toggle('on',labels);
-  $('netStatus').innerHTML= !an? 'Создайте NET, затем ставьте его точки на слоях.'
-    : `Активный NET: <b>${an.name}</b> · точек ${points.filter(p=>p.net===activeNet).length}<br>`+
-      `Точки ставятся на слой <b>${s?s.name:'—'}</b>.`+(netting?' <b>Alt+клик</b> — переходное (видно с обеих сторон). Правый клик / Delete по точке — удалить.':'')+
-      (hlNet?`<br><span class="good">подсвечен: ${nets.find(n=>n.id===hlNet).name}</span>`:'');
+  $('netStatus').innerHTML= !an? L('Создайте NET, затем ставьте его точки на слоях.','Create a NET, then place its points on the layers.')
+    : L(`Активный NET: <b>${an.name}</b> · точек ${points.filter(p=>p.net===activeNet).length}<br>`,
+        `Active NET: <b>${an.name}</b> · points ${points.filter(p=>p.net===activeNet).length}<br>`)+
+      L(`Точки ставятся на слой <b>${s?s.name:'—'}</b>.`,`Points go to layer <b>${s?s.name:'—'}</b>.`)+
+      (netting?L(' <b>Alt+клик</b> — переходное (видно с обеих сторон). Правый клик / Delete по точке — удалить.',
+                 ' <b>Alt+click</b> — via (visible on both sides). Right-click / Delete on a point — delete.'):'')+
+      (hlNet?`<br><span class="good">${L('подсвечен','highlighted')}: ${nets.find(n=>n.id===hlNet).name}</span>`:'');
 
   const cue=$('hudCue');
-  if(picking){cue.hidden=false;cue.textContent=`точка ${np+1}: клик по «${nextName}»`;}
-  else if(netting&&an){cue.hidden=false;cue.textContent=`${an.name}: клик — точка · Alt+клик — переходное · Ctrl+клик — новый NET`;}
-  else if(clickMode==='move'){cue.hidden=false;cue.textContent=`деформация: ${xfMode==='scale'?'масштаб':'вращение'} · клик по слою — сменить · ⊕ — центр (двойной клик — в центр) · Shift — шаг 15°`;}
-  else if(clickMode==='crop'){cue.hidden=false;cue.textContent='кроп «'+(s?s.name:'—')+'»: тяните стороны и углы, внутри — сдвиг рамки';}
+  if(picking){cue.hidden=false;cue.textContent=L(`точка ${np+1}: клик по «${nextName}»`,`point ${np+1}: click “${nextName}”`);}
+  else if(netting&&an){cue.hidden=false;cue.textContent=an.name+L(': клик — точка · Alt+клик — переходное · Ctrl+клик — новый NET (via)',': click — point · Alt+click — via · Ctrl+click — new NET (via)');}
+  else if(clickMode==='move'){cue.hidden=false;cue.textContent=L(`деформация: ${xfMode==='scale'?'масштаб (углы — пропорц., стороны — по оси)':'вращение'} · клик по слою — сменить · ⊕ — центр (двойной клик — в центр) · Shift — шаг 15°`,
+    `transform: ${xfMode==='scale'?'scale (corners — proportional, sides — one axis)':'rotate'} · click the layer — switch · ⊕ — pivot (double-click — back to centre) · Shift — 15° steps`);}
+  else if(clickMode==='crop'){cue.hidden=false;cue.textContent=L('кроп «'+(s?s.name:'—')+'»: тяните стороны и углы, внутри — сдвиг рамки','crop “'+(s?s.name:'—')+'”: drag sides and corners, inside — move the frame');}
   else cue.hidden=true;
   vp.classList.toggle('picking',clickMode!=='none');
   $('moveBtn').classList.toggle('on',clickMode==='move');
@@ -1498,7 +1603,7 @@ function sync(){
   $('moveBtn').disabled=!!(sel_()&&sel_().H);
   $('gridBtn').classList.toggle('on',grid); vp.classList.toggle('nogrid',!grid);
   $('invBtn').classList.toggle('on',inverted);
-  $('flipBoard').textContent='Плата: '+(boardSide==='top'?'TOP':'BOT')+' · перевернуть (F)';
+  $('flipBoard').textContent=L('Плата: ','Board: ')+(boardSide==='top'?'TOP':'BOT')+L(' · перевернуть (F)',' · flip (F)');
   $('xrayBtn').classList.toggle('on',xray);
   syncActl();
   { const l=sel_(); ['keyOn','keyCol','keyPick','keyTol'].forEach(i=>$(i).disabled=!l);
@@ -1521,23 +1626,23 @@ function snapshot(){
   return {v:4, count:layers.length, sel, refId, viewMode, swipe, view, boardSide, xray,
     inverted, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.tc,side:l.side,src:l.src,stored:l.stored,
-      x:l.x,y:l.y,rot:l.rot,scale:l.scale,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
+      x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe})),
     nets, points, activeNet, netSeq,
     comps, mmScale, compSeq, compKind, compSize, compSide, compRot, compVal, sideCol:SIDECOL, showSide, showNets, showComps, warpModel, imgDir, projName};
 }
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
-    if(!quiet&&Date.now()>statusHold) $('saveStatus').innerHTML='Сохранено · '+new Date().toLocaleTimeString('ru-RU');
-  }catch(err){ $('saveStatus').innerHTML='<span class="bad">Не сохранено: '+err.message+'</span>'; } },400);
+    if(!quiet&&Date.now()>statusHold) $('saveStatus').innerHTML=L('Сохранено · ','Saved · ')+new Date().toLocaleTimeString(LOC);
+  }catch(err){ $('saveStatus').innerHTML='<span class="bad">'+L('Не сохранено: ','Not saved: ')+err.message+'</span>'; } },400);
 }
 function restore(s){
   if(!s||!Array.isArray(s.layers))return false;
   layers.forEach(l=>{stopCam(l);l.clip.remove();l.fx.node.remove()}); layers=[];
   s.layers.forEach((d,i)=>{ const l=mkLayer(i,{
-    id:d.id, name:d.name||'Слой '+(i+1), color:d.color||LAYPAL[i%LAYPAL.length],
+    id:d.id, name:d.name||L('Слой ','Layer ')+(i+1), color:d.color||LAYPAL[i%LAYPAL.length],
     side:d.side||'any',
-    src:d.src||'', stored:!!d.stored, x:d.x||0,y:d.y||0,rot:d.rot||0,scale:d.scale||1,
+    src:d.src||'', stored:!!d.stored, x:d.x||0,y:d.y||0,rot:d.rot||0,scale:d.scale||1,sx:+d.sx||1,sy:+d.sy||1,
     fh:!!d.fh,fv:!!d.fv,op:typeof d.op==='number'?d.op:1,on:d.on!==false,H:d.H||null,
     tc:d.tc||LAYPAL[i%LAYPAL.length], tn:typeof d.tn==='number'?d.tn:0,
     tm:d.tm||s.tintMode||'color',
@@ -1584,9 +1689,12 @@ function checkMissing(){
   if(!bad.length&&!none){box.hidden=true;return;}
   box.hidden=false;
   box.innerHTML = bad.length
-    ? 'Не загружено: '+bad.map(l=>l.name+' — '+(l.src||'нет файла')).join('<br>')+
-      '<br>СЛОИ → «Выбрать файл…» в карточке слоя (картинки ищутся в pcb_overlay_img/).'
-    : 'Изображения не заданы. СЛОИ → «+ Добавить слой».';
+    ? L('Не загружено: ','Not loaded: ')+bad.map(l=>l.name+' — '+(l.src||L('нет файла','no file'))).join('<br>')+
+      L('<br>СЛОИ → «Выбрать файл…» в карточке слоя (картинки ищутся в pcb_overlay_img/).',
+        '<br>LAYERS → “Choose file…” in the layer card (images are looked up in pcb_overlay_img/).')
+    : layers.length ? L('Изображения не заданы. СЛОИ → «Выбрать файл…» в карточке слоя (',
+                        'No images set. LAYERS → “Choose file…” in the layer card (')+layers.map(l=>l.name).join(', ')+').'
+    : L('Изображения не заданы. СЛОИ → «+ Добавить слой».','No images set. LAYERS → “+ Add layer”.');
 }
 function setPath(l,v,reread){ v=(v||'').trim().replace(/\\/g,'/');
   l.src=v; l.stored=false; l.blob=null; localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{}); l.ok=false;
@@ -1615,7 +1723,7 @@ function storeFileLS(l,file){ /* fallback without IndexedDB: compressed webp in 
       try{ localStorage.setItem(IMGKEY(l.id),data); l.stored=true; l.src=dirJoin(imgDir,file.name);
            l.ok=false; l.el.src=data; save(); }
       catch(err){ l.stored=false; l.el.src=fr.result;
-        $('saveStatus').innerHTML='<span class="bad">не помещается в хранилище: '+err.message+'</span>'; }
+        $('saveStatus').innerHTML='<span class="bad">'+L('не помещается в хранилище: ','does not fit in storage: ')+err.message+'</span>'; }
       renderFiles(); sync();
     };
     im.src=fr.result;
@@ -1661,17 +1769,17 @@ function zipStore(files){ /* [{name, data:Uint8Array}] -> Blob */
 async function unzip(buf){ /* -> {name: Uint8Array}; store and deflate */
   const u=new Uint8Array(buf), v=new DataView(buf), dec=new TextDecoder(); let e=-1;
   for(let i=u.length-22;i>=Math.max(0,u.length-65557);i--) if(v.getUint32(i,true)===0x06054b50){e=i;break;}
-  if(e<0) throw new Error('файл не является архивом проекта');
+  if(e<0) throw new Error(L('файл не является архивом проекта','the file is not a project archive'));
   const out={}; let p=v.getUint32(e+16,true);
   for(let k=v.getUint16(e+10,true);k>0;k--){
-    if(v.getUint32(p,true)!==0x02014b50) throw new Error('повреждён каталог архива');
+    if(v.getUint32(p,true)!==0x02014b50) throw new Error(L('повреждён каталог архива','archive directory is corrupted'));
     const m=v.getUint16(p+10,true), cs=v.getUint32(p+20,true), nl=v.getUint16(p+28,true),
           xl=v.getUint16(p+30,true), cl=v.getUint16(p+32,true), lo=v.getUint32(p+42,true);
     const name=dec.decode(u.subarray(p+46,p+46+nl)); p+=46+nl+xl+cl;
     const ds=lo+30+v.getUint16(lo+26,true)+v.getUint16(lo+28,true); let data=u.subarray(ds,ds+cs);
     if(m===8) data=new Uint8Array(await new Response(new Blob([data]).stream()
       .pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
-    else if(m!==0) throw new Error('метод сжатия '+m+' не поддерживается');
+    else if(m!==0) throw new Error(L('метод сжатия '+m+' не поддерживается','compression method '+m+' is not supported'));
     if(!name.endsWith('/')) out[name]=data;
   }
   return out;
@@ -1694,14 +1802,14 @@ async function layerBlob(l){ /* original bytes of a layer image, or null if the 
 }
 let missLayers=[];
 async function saveProject(skipMissing){
-  const st=$('saveStatus'); st.textContent='Сборка проекта…'; $('missRow').hidden=true;
+  const st=$('saveStatus'); st.textContent=L('Сборка проекта…','Building project…'); $('missRow').hidden=true;
   const imgs=[], miss=[];
   for(const l of layers){ if(!l.src&&!l.stored) continue;
     const b=await layerBlob(l); if(b) imgs.push({l,b}); else miss.push(l); }
   if(miss.length&&!skipMissing){ missLayers=miss;
-    st.innerHTML='<span class="bad">Нет доступа к картинкам (страница открыта с диска):</span><br>'+
+    st.innerHTML='<span class="bad">'+L('Нет доступа к картинкам (страница открыта с диска):','No access to the images (the page is opened from disk):')+'</span><br>'+
       miss.map(l=>'<b>'+l.name+'</b> — '+(baseName(l.src)||'?')).join('<br>')+
-      '<br>Укажите эти файлы — они сохранятся в браузере, дальше не спросит.';
+      L('<br>Укажите эти файлы — они сохранятся в браузере, дальше не спросит.','<br>Locate these files — they will be kept in the browser and it will not ask again.');
     $('missRow').hidden=false; return; }
   const s=snapshot(), files=[], used=new Set();
   for(const {l,b} of imgs){
@@ -1716,17 +1824,17 @@ async function saveProject(skipMissing){
   try{
     if(!window.showSaveFilePicker) throw 0;
     const h=await showSaveFilePicker({suggestedName:fname,
-      types:[{description:'Проект PCBReverse',accept:{'application/zip':['.pcbr']}}]});
+      types:[{description:L('Проект PCBReverse','PCBReverse project'),accept:{'application/zip':['.pcbr']}}]});
     const w=await h.createWritable(); await w.write(zip); await w.close();
     projName=h.name.replace(/\.pcbr$/i,'')||projName;
   }catch(err){
-    if(err&&err.name==='AbortError'){ st.textContent='Сохранение отменено.'; return; }
+    if(err&&err.name==='AbortError'){ st.textContent=L('Сохранение отменено.','Save cancelled.'); return; }
     const a=document.createElement('a'); a.href=URL.createObjectURL(zip); a.download=fname; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   }
-  st.innerHTML='<span class="good">Проект сохранён: '+projName+'.pcbr</span> · картинок '+imgs.length+
-    (miss.length?' · <span class="bad">без картинок: '+miss.map(l=>l.name).join(', ')+'</span>':'')+
-    ' · '+(zip.size/1048576).toFixed(1)+' МБ';
+  st.innerHTML='<span class="good">'+L('Проект сохранён: ','Project saved: ')+projName+'.pcbr</span>'+L(' · картинок ',' · images ')+imgs.length+
+    (miss.length?' · <span class="bad">'+L('без картинок: ','without images: ')+miss.map(l=>l.name).join(', ')+'</span>':'')+
+    ' · '+(zip.size/1048576).toFixed(1)+L(' МБ',' MB');
   statusHold=Date.now()+5000; save(true);
 }
 function pickMissing(files){
@@ -1746,15 +1854,15 @@ async function loadProject(f){
   const st=$('saveStatus');
   try{
     if(/\.json$/i.test(f.name)){ /* old JSON export */
-      const s=JSON.parse(await f.text()); if(!restore(s)) throw new Error('нет слоёв');
-      loadImages(); afterLoad('Загружено (JSON): '+f.name); return; }
-    st.textContent='Чтение проекта…';
+      const s=JSON.parse(await f.text()); if(!restore(s)) throw new Error(L('нет слоёв','no layers'));
+      loadImages(); afterLoad(L('Загружено (JSON): ','Loaded (JSON): ')+f.name); return; }
+    st.textContent=L('Чтение проекта…','Reading project…');
     const ent=await unzip(await f.arrayBuffer());
-    if(!ent['project.json']) throw new Error('в архиве нет project.json');
+    if(!ent['project.json']) throw new Error(L('в архиве нет project.json','no project.json in the archive'));
     const s=JSON.parse(new TextDecoder().decode(ent['project.json']));
     layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
     await idb.clear().catch(()=>{});
-    if(!restore(s)) throw new Error('нет слоёв');
+    if(!restore(s)) throw new Error(L('нет слоёв','no layers'));
     projName=f.name.replace(/\.(pcbr|zip)$/i,'');
     let n=0;
     for(const d of s.layers){ const l=byId(d.id); if(!l) continue; l.ok=false; l.blob=null;
@@ -1764,8 +1872,8 @@ async function loadProject(f){
       else if(l.kind==='video') startCam(l,true);
       else { l.stored=false; if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); }
     }
-    afterLoad('Проект загружен: '+f.name+' · картинок '+n);
-  }catch(err){ st.innerHTML='<span class="bad">Ошибка загрузки: '+err.message+'</span>'; }
+    afterLoad(L('Проект загружен: ','Project loaded: ')+f.name+L(' · картинок ',' · images ')+n);
+  }catch(err){ st.innerHTML='<span class="bad">'+L('Ошибка загрузки: ','Load error: ')+err.message+'</span>'; }
 }
 
 /* ---------- interaction ---------- */
@@ -1793,6 +1901,13 @@ vp.addEventListener('pointerdown',e=>{
     if(hb==='scale'||hb==='rot'){ const P=layerBox(s).P, m=evXY(e);
       drag={t:'l'+hb,x:e.clientX,y:e.clientY,moved:false,P,Pw:worldOf(s,pivotImg(s)),
         d0:Math.hypot(m.x-P.x,m.y-P.y)||1, a0:Math.atan2(m.y-P.y,m.x-P.x), osc:s.scale, orot:s.rot, ox:s.x, oy:s.y};
+      vp.setPointerCapture(e.pointerId); return; }
+    if(hb==='sx'||hb==='sy'){   /* side handle: stretch along that image axis about the pivot */
+      const pv=pivotImg(s), P=layerBox(s).P, m=evXY(e);
+      const a=screenOf(worldOf(s,hb==='sx'?{x:0,y:pv.y}:{x:pv.x,y:0})), c=screenOf(worldOf(s,hb==='sx'?{x:s.w,y:pv.y}:{x:pv.x,y:s.h}));
+      const len=Math.hypot(c.x-a.x,c.y-a.y)||1, u={x:(c.x-a.x)/len,y:(c.y-a.y)/len}, d0=(m.x-P.x)*u.x+(m.y-P.y)*u.y;
+      if(Math.abs(d0)<4) return;   /* pivot under the handle: nothing to stretch about */
+      drag={t:'lstretch',a:hb,x:e.clientX,y:e.clientY,moved:false,P,u,d0,o:s[hb]||1,piv:{...pv},Pw:worldOf(s,pv)};
       vp.setPointerCapture(e.pointerId); return; }
     if(s&&!s.H){ drag={t:'layer',x:e.clientX,y:e.clientY,moved:false,ox:s.x,oy:s.y,inside:hb==='in'};
       vp.classList.add('grabbing'); vp.setPointerCapture(e.pointerId); }
@@ -1825,7 +1940,10 @@ vp.addEventListener('dblclick',e=>{
 vp.addEventListener('pointermove',e=>{
   if(!drag){
     if(clickMode==='move'){ const h=hitLayerBox(e);
-      vp.style.cursor=h==='piv'?'move':h==='scale'?'nwse-resize':h==='rot'?'alias':''; }
+      let c=h==='piv'?'move':h==='scale'?'nwse-resize':h==='rot'?'alias':'';
+      if(h==='sx'||h==='sy'){ const q=layerBox(sel_()).q, v=h==='sx'?{x:q[1].x-q[0].x,y:q[1].y-q[0].y}:{x:q[3].x-q[0].x,y:q[3].y-q[0].y};
+        c=Math.abs(v.x)>=Math.abs(v.y)?'ew-resize':'ns-resize'; }
+      vp.style.cursor=c; }
     if(clickMode==='crop'){ const h=sel_()&&hitCropBox(e);
       vp.style.cursor=!h?'':h.ex==='in'?'move':(h.ex&&h.ey)?'nwse-resize':h.ex?'ew-resize':'ns-resize'; }
     return; }
@@ -1838,6 +1956,11 @@ vp.addEventListener('pointermove',e=>{
     const d=screenDelta(dx,dy);
     s.x=drag.ox+d.x; s.y=drag.oy+d.y; applyLayer(s); sync(); return;}
   if(drag.t==='piv'){ const s=sel_(); if(!s)return; s.piv=imgOf(s,worldFromEvent(e)); drawMarks(); return; }
+  if(drag.t==='lstretch'){ const s=sel_(); if(!s||s.H)return;
+    const m=evXY(e), d=(m.x-drag.P.x)*drag.u.x+(m.y-drag.P.y)*drag.u.y;
+    s[drag.a]=Math.max(.01,+(drag.o*d/drag.d0).toFixed(4));
+    s.x=s.y=0; const v=T(s,drag.piv); s.x=drag.Pw.x-v.x; s.y=drag.Pw.y-v.y;   /* pivot stays in place */
+    applyLayer(s); sync(); return;}
   if(drag.t==='lscale'||drag.t==='lrot'){ const s=sel_(); if(!s||s.H)return;
     const m=evXY(e), px=m.x-drag.P.x, py=m.y-drag.P.y, W=drag.Pw, t0={x:drag.ox-W.x,y:drag.oy-W.y};
     if(drag.t==='lscale'){       /* scale about the pivot: t' = Pw + k (t - Pw) */
@@ -1896,8 +2019,8 @@ vp.addEventListener('pointerup',e=>{
   if(clickMode==='align'&&s){
     const r=byId(refId); if(!r)return;
     if(s.pairs.length>=8&&!pending)return;
-    if(!pending) pending=imgOf(r,m);
-    else { s.pairs.push({rl:refId, r:pending, m:imgOf(s,m)}); pending=null;
+    if(!pending) pending=imgOf(s,m);          /* 1st click: active layer, 2nd: the same point on the reference */
+    else { s.pairs.push({rl:refId, r:imgOf(r,m), m:pending}); pending=null;
            if(s.pairs.length>=2)recompute(false); }
     sync(); drawMarks(); save(); return;
   }
@@ -1907,7 +2030,7 @@ vp.addEventListener('pointerup',e=>{
     const hit=!newNet&&hitPoint(m);
     if(hit){ selPoint=hit.id; activeNet=hit.net; hlNet=hit.net; renderNets(); }
     else if(activeNet){
-      const via=e.altKey; /* Alt+click: via, shown on both sides */
+      const via=e.altKey||newNet; /* Alt+click: via, shown on both sides; a new NET (Ctrl+click) starts with a via */
       const host=mainOf(boardSide)||s;   /* glued to the side's main photo, follows its move / warp */
       points.push({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
         net:activeNet, layer:host.id, side:boardSide, p:imgOf(host,m), ...(via?{via:true}:{})});
@@ -1972,7 +2095,7 @@ numIn('sclv',v=>{ const s=sel_(); if(!s||s.H)return;
   s.scale=Math.min(50,Math.max(0.01,v)); applyLayer(s); sync(); });
 $('scl').oninput=()=>{const s=sel_(); if(!s)return; s.scale=parseFloat($('scl').value);applyLayer(s);sync()};
 $('rstLayer').onclick=()=>{const s=sel_(); if(!s)return;
-  s.x=s.y=s.rot=0;s.scale=1;s.H=null;warpInfo='';applyLayer(s);renderCards();sync()};
+  s.x=s.y=s.rot=0;s.scale=s.sx=s.sy=1;s.H=null;warpInfo='';applyLayer(s);renderCards();sync()};
 $('cropBtn').onclick=()=>{ clickMode=clickMode==='crop'?'none':'crop';
   if(clickMode==='crop'){pending=null;calib=null;} sync();syncComps();drawMarks(); };
 $('rstCrop').onclick=()=>{ const s=sel_(); if(!s)return; s.crop=null; applyLayer(s); sync(); };
@@ -2083,7 +2206,7 @@ function syncActl(){ const l=sel_(), ids=['aOp','aBlend','aTc','aTn','aTm','aFh'
   const keep=i=>document.activeElement!==$(i);
   if(keep('aOp')) $('aOp').value=Math.round(l.op*100); $('aOpV').textContent=Math.round(l.op*100)+'%';
   $('aBlend').value=l.blend; $('aBlend').disabled=idx(l.id)===0;
-  $('aBlend').title=idx(l.id)===0?'нижний слой смешивать не с чем':'режим наложения на нижележащие слои';
+  $('aBlend').title=idx(l.id)===0?L('нижний слой смешивать не с чем','the bottom layer has nothing to blend with'):L('режим наложения на нижележащие слои','blend mode over the layers below');
   if(keep('aTc')) $('aTc').value=l.tc;
   if(keep('aTn')) $('aTn').value=Math.round(l.tn*100); $('aTnV').textContent=Math.round(l.tn*100)+'%';
   $('aTm').value=l.tm||tintMode;
@@ -2119,8 +2242,16 @@ $('missPick').onclick=()=>$('fileMany').click();
 $('missSkip').onclick=()=>saveProject(true);
 $('fileMany').onchange=e=>{ const fs=[...e.target.files]; e.target.value=''; if(fs.length) pickMissing(fs); };
 $('saveNow').onclick=()=>{booted=true;save()};
-$('resetAll').onclick=()=>{ localStorage.removeItem(KEY);
+$('newProj').onclick=()=>{
+  const n=layers.filter(l=>l.src||l.stored).length;
+  if(!confirm(L('Новый проект?\n\nИз браузера будут удалены: слои ('+layers.length+', с картинками '+n+'), NET ('+nets.length+
+    '), компоненты ('+comps.length+'), деформации и калибровка.\nНе сохранённое в *.pcbr пропадёт.',
+    'New project?\n\nThis removes from the browser: layers ('+layers.length+', with images '+n+'), NETs ('+nets.length+
+    '), components ('+comps.length+'), warps and calibration.\nAnything not saved to *.pcbr will be lost.'))) return;
+  booted=false; clearTimeout(saveTimer);          /* no autosave between clearing and reload */
+  localStorage.removeItem(KEY);
   layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
+  try{ sessionStorage.setItem(NEWKEY,'1'); }catch(err){}
   idb.clear().catch(()=>{}).then(()=>location.reload()); };
 
 addEventListener('keydown',e=>{
@@ -2185,15 +2316,25 @@ function fit(){ const l=layers[0]||{w:1200,h:2680};
 /* ---------- boot ---------- */
 let restored=false;
 try{ const raw=localStorage.getItem(KEY); if(raw) restored=restore(JSON.parse(raw)); }catch(err){}
-if(!restored){
-  layers.push(mkLayer(0,{name:'Сторона A',src:'pcb_overlay_img/sideA.webp'}));
-  layers.push(mkLayer(1,{name:'Сторона B',src:'pcb_overlay_img/sideB.webp',fh:true,op:.5}));
+let fresh=false; try{ fresh=sessionStorage.getItem(NEWKEY)==='1'; sessionStorage.removeItem(NEWKEY); }catch(err){}
+if(!restored&&fresh){   /* «Новый проект»: empty main layers, pick photos in the cards */
+  layers.push(mkLayer(0,{name:'TOP',side:'top',main:true}));
+  layers.push(mkLayer(1,{name:'BOT',side:'bot',main:true,fh:true,op:.5}));
+  restack(); sel='L1'; refId='L2';
+} else if(!restored){
+  layers.push(mkLayer(0,{name:L('Сторона A','Side A'),src:'pcb_overlay_img/sideA.webp'}));
+  layers.push(mkLayer(1,{name:L('Сторона B','Side B'),src:'pcb_overlay_img/sideB.webp',fh:true,op:.5}));
   restack(); sel='L2'; refId='L1';
 }
 loadImages(); renderCards(); renderFiles(); renderNets(); renderComps(); applyAll();
 if(restored) applyView(); else fit();
 sync(); checkMissing(); booted=true;
-$('saveStatus').innerHTML= restored? 'Состояние восстановлено.' : 'Автосохранение включено.';
+if(fresh&&!restored) save(true);   /* persist the empty project, else a reload brings the demo back */
+$('saveStatus').innerHTML= restored? L('Состояние восстановлено.','State restored.') : L('Автосохранение включено.','Autosave is on.');
+$('langBtn').textContent=L('EN','RU'); $('langBtn').title=L('Switch to English','Переключить на русский');
+$('langBtn').onclick=()=>{ clearTimeout(saveTimer);   /* save now, then reload in the other language */
+  try{ localStorage.setItem(KEY,JSON.stringify(snapshot())); localStorage.setItem(LANGKEY,L('en','ru')); }catch(err){}
+  location.reload(); };
 </script>
 </body>
 </html>

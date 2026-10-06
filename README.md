@@ -1,95 +1,100 @@
 # PCBReverse
 
-Инструмент для реверса печатных плат в одном HTML-файле: совмещение фото и сканов сторон платы,
-герберов и справочных картинок из даташитов, разметка цепей (NET) и расстановка SMD-компонентов.
-Без сборки, без сервера, без зависимостей — открывается прямо с диска в Chrome / Edge.
+**English** | [Русский](README.ru.md)
 
-![Общий вид: слои платы, точки NET, компоненты](docs/overview.jpg)
+A single-HTML-file tool for PCB reverse engineering: overlay photos and scans of both board sides,
+Gerber renders and reference images from datasheets, trace nets (NET) and place SMD components.
+No build, no server, no dependencies — opens straight from disk in Chrome / Edge.
+The UI is in English and Russian; the **EN / RU** switch is at the right end of the left-panel tabs.
 
-## Возможности
+![Overview: board layers, NET points, components](docs/overview_en.jpg)
 
-- **Слои** — фото, сканы, PNG из герберов, пинауты из документации; сколько угодно.
-  Сторона слоя TOP / BOT / обе, главный слой стороны (*TOP main* / *BOT main*), прозрачность,
-  режимы наложения, тонировка, отражения и повороты. Порядок — группами TOP / BOT.
-- **Совмещение слоёв**
-  - ручная деформация как в CorelDRAW: рамка, масштаб и вращение вокруг перемещаемого центра;
-  - деформация по опорным точкам (2–8 пар): подобие, аффинная, перспектива;
-  - кроп слоя, мягкие края.
-- **Обработка картинки** — удаление фона по цвету (пипетка, допуск), коррекция цвета: уровни, гамма,
-  контраст, яркость, насыщенность, резкость, постеризация; пресеты для читаемости шелкографии.
-- **Просмотр** — переворот платы (F) с фиксацией точки под курсором, XRAY (обе стороны сразу),
-  «только активный», шторка, поворот и отражение вида, зум к курсору.
-- **NET** — точки цепей на стороне платы, переходные отверстия (видны с обеих сторон),
-  подсветка цепи, подписи.
-- **Компоненты** — R / C 0201…0805 в реальном масштабе (калибровка по эталону), номера выводов,
-  автоматическая привязка выводов к NET по точкам на падах.
-- **Видео (экспериментально)** — USB-микроскоп или камера как слой поверх платы или в отдельном окне;
-  кадр одной кнопкой встаёт «заплаткой» в главный слой стороны — дорисовать места, которые на основном
-  фото получились плохо.
-- **Проект `*.pcbr`** — zip без сжатия: `project.json` (все настройки) + оригиналы картинок.
-  Работа автоматически сохраняется в браузере.
+## Features
 
-![Разметка NET и компонентов крупным планом](docs/nets.jpg)
+- **Layers** — photos, scans, Gerber PNGs, pinouts from datasheets; as many as you need.
+  Layer side TOP / BOT / both, main layer of a side (*TOP main* / *BOT main*), opacity,
+  blend modes, tint, mirroring and rotation. Ordered in TOP / BOT groups.
+- **Layer alignment**
+  - CorelDRAW-like free transform: frame, scale (corners — proportional, sides — one axis)
+    and rotation around a movable pivot;
+  - warp by reference points (2–8 pairs): similarity, affine, perspective;
+  - layer crop, soft edges.
+- **Image processing** — background removal by color (eyedropper, tolerance), color correction: levels, gamma,
+  contrast, brightness, saturation, sharpness, posterize; presets for legible silkscreen.
+- **Viewing** — board flip (F) keeping the point under the cursor in place, view modes side / active / swipe
+  and XRAY (both sides at once), view rotation and mirroring, zoom to cursor.
+- **NETs** — net points on a board side, vias (visible from both sides), net highlighting, labels.
+- **Components** — R / C 0201…0805 at true scale (calibrated against a gauge part), pin numbers,
+  automatic pin-to-NET assignment from points on the pads.
+- **Video (experimental)** — a USB microscope or camera as a layer over the board or in a separate window;
+  one button turns a frame into a “patch” of the side's main layer — to fill in spots that came out
+  poorly on the main photo.
+- **Project `*.pcbr`** — an uncompressed zip: `project.json` (all settings) + original images.
+  Work is autosaved in the browser.
 
-## Быстрый старт
+![NET and component markup close-up](docs/nets_en.jpg)
 
-1. Скачать или клонировать репозиторий.
-2. Открыть `index.html` в Chrome или Edge (двойной клик — работает с `file://`).
-3. Правая вкладка **СЛОИ → «+ Добавить слой»** и выбрать картинку; повторить для остальных слоёв.
-4. Совместить слои: левая вкладка **СЛОЙ → «Ручная деформация (M)»** или **ДЕФОРМ** — опорные точки.
-5. Размечать: **NETS → «Редактирование NET» (N)**, **КОМП → калибровка → «Редактирование компонентов» (K)**.
-6. Сохранить: левая вкладка **ВИД → «Сохранить проект»**.
+## Quick start
 
-Пример — `tests/test_project.pcbr`: модуль QSFP/SFP, обе стороны, герберы, NET, компоненты.
-Открыть: **ВИД → «Загрузить проект»**.
+1. Download or clone the repository.
+2. Open `index.html` in Chrome or Edge (double-click — works from `file://`).
+3. Right tab **LAYERS → “+ Add layer”** and pick an image; repeat for the other layers.
+4. Align the layers: left tab **LAYER → “Free transform (M)”** or **WARP** — reference points.
+5. Mark up: **NETS → “Edit NETs” (N)**, **PARTS → calibrate → “Edit components” (K)**.
+6. Save: left tab **VIEW → “Save project”**.
 
-Картинки, заданные путём (старые проекты), ищутся в папке `pcb_overlay_img/` рядом с `index.html`.
-Выбранные через диалог файлы хранятся в браузере (IndexedDB) и попадают в `.pcbr`.
+Example — `tests/test_project.pcbr`: a QSFP/SFP module, both sides, Gerbers, NETs, components.
+Open it with **VIEW → “Open project”**.
 
-## Интерфейс
+Images given by path (older projects) are looked up in the `pcb_overlay_img/` folder next to `index.html`.
+Files chosen in the file dialog are kept in the browser (IndexedDB) and go into the `.pcbr`.
 
-| Где | Что |
+## Interface
+
+| Where | What |
 |---|---|
-| слева **ВИД** | переворот платы, XRAY, показ NET / компонентов, вид, сетка, инверсия; сохранение проекта |
-| слева **СЛОЙ** | активный слой: угол / масштаб, ручная деформация, кроп, удаление фона, коррекция цвета |
-| слева **ДЕФОРМ** | деформация по опорным точкам |
-| слева **КОМП** | калибровка масштаба, установка R / C, свойства, список |
-| слева **?** | шпаргалка клавиш |
-| справа **СЛОИ** | шапка: «+ Добавить слой», режим просмотра, опора, α / тонировка / отражения активного слоя; список слоёв |
-| справа **NETS** | режим редактирования, список цепей |
-| справа **ВИДЕО** | камера, наложение / окно, «Дополнить слой» |
+| left **VIEW** | board flip, NET / component visibility, view, grid, invert; save, open, new project |
+| left **LAYER** | active layer: angle / scale, free transform, crop, background removal, color correction |
+| left **WARP** | warp by reference points |
+| left **PARTS** | scale calibration, R / C placement, properties, list |
+| left **?** · **RU** | key reference · language switch |
+| right **LAYERS** | header: “+ Add layer”, view mode + XRAY, reference, α / tint / mirroring of the active layer; layer list |
+| right **NETS** | edit mode, net list |
+| right **VIDEO** | camera, overlay / window, “Patch layer” |
 
-Ширина боковых панелей меняется перетаскиванием края; двойной клик — по умолчанию.
+Side panel widths change by dragging their edge; double-click restores the default.
 
-## Клавиши и мышь
+## Keys and mouse
 
 | | |
 |---|---|
-| колесо / средняя кнопка | зум к курсору / панорама |
-| **F** | перевернуть плату (TOP ⇄ BOT) |
-| **R**, **Shift+R** · **H**, **V** | повернуть вид на 90° · отразить вид |
-| **1…8** · **X** | видимость слоя · следующий активный слой |
-| **M** | ручная деформация: клик по слою — масштаб ⇄ вращение, ⊕ — центр, Shift — шаг 15° |
-| **P** | опорные точки деформации, **Z** — отменить точку |
-| **N** | редактирование NET: клик — точка, **Alt+клик** — переходное, **Ctrl+клик** — новый NET |
-| **K** | редактирование компонентов, **Space** / **Shift+Space** — поворот на 45° |
-| правый клик, **Delete** | удалить точку / компонент (только в режимах N / K) |
-| **[ ]** | поворот слоя на 0.1° (с Shift — 1°) |
-| стрелки | сдвиг слоя (M) или компонента (K) |
-| **Esc** | выйти из режима |
+| wheel / middle button | zoom to cursor / pan |
+| **F** | flip the board (TOP ⇄ BOT) |
+| **R**, **Shift+R** · **H**, **V** | rotate view 90° · mirror view |
+| **1…8** · **X** | layer visibility · next active layer |
+| **M** | free transform: click the layer — scale ⇄ rotate, ⊕ — pivot, Shift — 15° steps |
+| **P** | warp reference points, **Z** — undo point |
+| **N** | edit NETs: click — point, **Alt+click** — via, **Ctrl+click** — new NET (first point is a via) |
+| **K** | edit components, **Space** / **Shift+Space** — rotate 45° |
+| right-click, **Delete** | delete a point / component (N / K modes only) |
+| **[ ]** | rotate the layer 0.1° (1° with Shift) |
+| arrows | move the layer (M) or component (K) |
+| **Esc** | leave the mode |
 
-## Требования и ограничения
+## Requirements and limitations
 
-- Chromium-браузер: Chrome, Edge. Нужны IndexedDB, SVG-фильтры, CSS mask, `getUserMedia` для видео.
-- Страница с `file://` не может прочитать картинки по путям; при первом сохранении проекта она попросит
-  указать эти файлы один раз.
-- Данные автосохранения живут в профиле браузера. Переносить работу между компьютерами — через `.pcbr`.
+- A Chromium browser: Chrome, Edge. Needs IndexedDB, SVG filters, CSS mask, `getUserMedia` for video.
+- A page opened from `file://` cannot read images by path; on the first project save it asks you
+  to locate those files once.
+- Autosave data lives in the browser profile. To move work between computers, use `.pcbr`.
 
-## Разработка
+## Development
 
-Всё приложение — `index.html` (HTML + CSS + JS). Заметки по устройству и решения — в `CLAUDE.md`.
+The whole app is `index.html` (HTML + CSS + JS). Design notes and decisions are in `CLAUDE.md` (in Russian).
+UI strings: markup is written in Russian and translated by the `I18N` dictionary at start;
+dynamic strings use `L('рус', 'eng')`.
 
-Смоук-тест (Playwright) открывает `tests/test_project.pcbr` и проверяет совмещение, деформацию и сохранение:
+The smoke test (Playwright) opens `tests/test_project.pcbr` and checks alignment, warping and saving:
 
 ```bash
 npm i -D playwright

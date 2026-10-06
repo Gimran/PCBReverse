@@ -21,7 +21,7 @@ const PCBR = /\.pcbr$/i.test(STATE);
   await p.evaluate(() => localStorage.clear());
   if (PCBR) {
     await p.setInputFiles('#fileProj', STATE); await p.waitForTimeout(2000);
-    ok(await p.evaluate(() => /Проект загружен/.test($('saveStatus').textContent)), 'project loads: ' + path.basename(STATE));
+    ok(await p.evaluate(() => /Проект загружен|Project loaded/.test($('saveStatus').textContent)), 'project loads: ' + path.basename(STATE));
   } else if (fs.existsSync(STATE)) {
     const s = JSON.parse(fs.readFileSync(STATE, 'utf8'));
     // images picked via dialog live in the browser only - point them at the disk copies
