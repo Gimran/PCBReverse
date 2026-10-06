@@ -2562,6 +2562,7 @@ vp.addEventListener('pointerup',e=>{
     const hit=hitPoint(m), hc=!hit&&hitComp(m);
     if(!hit&&(hlNet||selPoint)){ hlNet=null; selPoint=null; renderNets(); sync(); }   /* click off a NET point clears it */
     if(hc){ selComp=hc.id; renderComps(); drawMarks(); syncComps(); return; }
+    if(!hit&&selComp){ selComp=null; renderComps(); drawMarks(); syncComps(); sync(); }   /* empty spot: deselect the part too */
   }
   if(clickMode==='align'&&s){
     const r=byId(refId); if(!r)return;
