@@ -146,7 +146,7 @@ button.wide{width:100%}
 .xbox{display:flex;align-items:center;gap:1px;border:1px solid var(--line);border-radius:4px;background:var(--panel-2);
   box-shadow:var(--shadow);font-family:"IBM Plex Mono",monospace;font-size:11px;padding-right:3px;min-width:0}
 .xbox button{border:0;box-shadow:none;background:transparent;flex:1;min-width:0;padding:5px 1px}
-.xbox input{width:22px;flex:none;padding:1px 1px;font:inherit;text-align:right;border:1px solid var(--line);
+.xbox input[type=text]{width:22px;flex:none;padding:1px 1px;font:inherit;text-align:right;border:1px solid var(--line);
   border-radius:3px;background:var(--panel);color:var(--text)}
 .xbox.on{background:var(--text);border-color:var(--text);color:var(--panel)}
 .xbox.on button{color:var(--panel)}
@@ -264,7 +264,10 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
             <button class="mini" id="rstView">вписать</button>
             <button class="mini on" id="gridBtn">сетка 32 px</button>
           </div>
-          <button class="mini wide" id="invBtn">инверсия цветов</button>
+          <div class="modes two">
+            <button class="mini" id="invBtn">инверсия цветов</button>
+            <button class="mini" id="grayBtn" title="все слои в градациях серого — разметка остаётся цветной">градации серого</button>
+          </div>
         </div>
         <div class="sect">
           <div class="lbl">Состояние</div>
@@ -559,7 +562,8 @@ const I18N={
   'повернуть вид на 90° влево (Shift+R)':'rotate view 90° left (Shift+R)','повернуть вид на 90° вправо (R)':'rotate view 90° right (R)',
   'отразить вид по горизонтали (H)':'mirror view horizontally (H)','отразить вид по вертикали (V)':'mirror view vertically (V)',
   '⇄ вид':'⇄ view','⇅ вид':'⇅ view','сбросить поворот и отражения':'reset rotation and mirroring','сброс вида':'reset view',
-  'вписать':'fit','сетка 32 px':'grid 32 px','инверсия цветов':'invert colors',
+  'вписать':'fit','сетка 32 px':'grid 32 px','инверсия цветов':'invert colors','градации серого':'grayscale',
+  'все слои в градациях серого — разметка остаётся цветной':'all layers in grayscale — the markup stays in colour',
   'Состояние':'State','Автосохранение включено.':'Autosave is on.','Указать файлы…':'Locate files…','Сохранить без них':'Save without them',
   '*.pcbr — zip без сжатия: project.json (слои, деформация, NET, компоненты, вид) + оригиналы картинок':
     '*.pcbr — uncompressed zip: project.json (layers, warp, NETs, components, view) + original images',
@@ -650,7 +654,7 @@ const vp=$('vp'), stack=$('stack'), handle=$('handle'), marks=$('marks'), defs=$
 
 let layers=[];                 /* index 0 = bottom */
 let view={x:0,y:0,z:1,rot:0,fh:false,fv:false}, sel=null, refId=null, viewMode='all', swipe=.5;
-let inverted=false, grid=true, tintMode='color', labels=true, blinkOn=true;
+let grayView=false, inverted=false, grid=true, tintMode='color', labels=true, blinkOn=true;
 let clickMode='none', pending=null, warpInfo='', boardSide='top', xray=false;
 let showNets=true, showComps=true; /* global overlay toggles */
 /* xray — boardSide не скрывает слои другой стороны */
@@ -1054,7 +1058,7 @@ function drawMarks(){
   });
   if(pending&&sel_()) cross(screenOf(worldOf(sel_(),pending)),6,.8);   /* pending = point on the active layer */
   const fNet=hlNet!==null&&nets.find(n=>n.id===hlNet&&n.on);   /* NET focus: the rest goes grey */
-  $('stack').classList.toggle('gray',!!(fNet&&showNets));
+  $('stack').classList.toggle('gray',grayView||!!(fNet&&showNets));
   const grey=n0=>{ for(let i=n0;i<marks.children.length;i++){ const e=marks.children[i];
     if(!e.hasAttribute('data-hot')) e.style.filter='grayscale(1)'; } };
   if(showNets&&fNet){   /* star: from the selected point (else the one nearest the centre) to every other point */
@@ -2209,7 +2213,7 @@ function sync(){
     b.classList.toggle('on',clickMode===b.dataset.mode&&sel===b.dataset.lid));
   $('moveBtn').disabled=!!(sel_()&&sel_().H);
   $('gridBtn').classList.toggle('on',grid); vp.classList.toggle('nogrid',!grid);
-  $('invBtn').classList.toggle('on',inverted);
+  $('invBtn').classList.toggle('on',inverted); $('grayBtn').classList.toggle('on',grayView);
   $('flipBoard').textContent=L('Плата: ','Board: ')+(boardSide==='top'?'TOP':'BOT')+L(' · перевернуть (F)',' · flip (F)');
   $('xrayBtn').classList.toggle('on',xray); $('xrayBox').classList.toggle('on',xray);
   if(document.activeElement!==$('xrayOp')) $('xrayOp').value=Math.round(xrayOp*100);
@@ -2233,7 +2237,7 @@ function sync(){
 let saveTimer=null, statusHold=0; /* project messages stay visible a few seconds */
 function snapshot(){
   return {v:4, count:layers.length, sel, refId, viewMode, swipe, view, boardSide, xray,
-    inverted, grid, labels, blinkOn, tintMode,
+    inverted, grayView, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.tc,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe})),
@@ -2264,7 +2268,7 @@ function restore(s){
   refId=byId(s.refId)&&s.refId!==sel?s.refId:(layers.find(l=>l.id!==sel)||layers[0]).id;
   viewMode=s.viewMode||'all'; swipe=typeof s.swipe==='number'?s.swipe:.5;
   boardSide=s.boardSide==='bot'?'bot':'top'; xray=!!s.xray;
-  view=Object.assign({x:0,y:0,z:1,rot:0,fh:false,fv:false},s.view||{}); inverted=!!s.inverted; grid=s.grid!==false; labels=s.labels!==false;
+  view=Object.assign({x:0,y:0,z:1,rot:0,fh:false,fv:false},s.view||{}); inverted=!!s.inverted; grayView=!!s.grayView; grid=s.grid!==false; labels=s.labels!==false;
   blinkOn=s.blinkOn!==false; tintMode=s.tintMode||'color';
   nets=s.nets||[]; points=s.points||[];
   activeNet=s.activeNet||(nets[0]?nets[0].id:null); netSeq=s.netSeq||nets.length+1;
@@ -2811,6 +2815,7 @@ $('vflipV').onclick=()=>{view.fv=!view.fv;applyView();sync()};
 $('vreset').onclick=()=>{view.rot=0;view.fh=view.fv=false;applyView();sync()};
 $('gridBtn').onclick=()=>{grid=!grid;sync();save()};
 $('invBtn').onclick=()=>{inverted=!inverted;applyAll();sync()};
+$('grayBtn').onclick=()=>{grayView=!grayView;drawMarks();sync();save()};
 
 $('pickBtn').onclick=()=>{clickMode=clickMode==='align'?'none':'align';
   if(clickMode!=='align')pending=null;
