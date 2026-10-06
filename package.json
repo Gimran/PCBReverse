@@ -3,6 +3,7 @@
   "private": true,
   "description": "PCB reverse-engineering overlay — dev tooling only (the app itself needs no build)",
   "scripts": {
+    "check": "node tests/check.js",
     "smoke": "node tests/smoke.js"
   },
   "devDependencies": {

@@ -91,7 +91,7 @@ Side panel widths change by dragging their edge; double-click restores the defau
 
 ## Development
 
-The whole app is `index.html` (HTML + CSS + JS). Design notes and decisions are in `CLAUDE.md` (in Russian).
+The app is `index.html` + `css/app.css` + `js/*.js` (plain scripts, no build — still opens from `file://`). Design notes and decisions are in `CLAUDE.md` (in Russian).
 UI strings: markup is written in Russian and translated by the `I18N` dictionary at start;
 dynamic strings use `L('рус', 'eng')`.
 
