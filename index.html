@@ -388,7 +388,10 @@ input[type=color]{width:26px;height:24px;padding:0;border:1px solid var(--line);
           <select id="compSide" class="slim">
             <option value="top">top-comp</option><option value="bot">bot-comp</option>
           </select></div>
-        <button class="mini wide" id="compPick" disabled>Редактирование компонентов (K)</button>
+        <div class="pick2">
+          <button class="mini" id="compPick" disabled title="редактирование компонентов: выбор, перетаскивание, поворот, удаление">Правка (K)</button>
+          <button class="mini" id="compPlace" disabled title="ставить новые компоненты выбранного типа; Esc или повторное нажатие — закончить">Поставить</button>
+        </div>
         <div class="status" id="compStatus"></div>
       </div>
 
@@ -536,7 +539,9 @@ const I18N={
   'Масштаб платы':'Board scale','эталон':'gauge','px/мм':'px/mm','Калибровать':'Calibrate','Готово':'Done',
   'Поставить компонент':'Place component','R · резистор':'R · resistor','C · конденсатор':'C · capacitor','корпус':'package','сторона':'side',
   'U · микросхема / разъём':'U · IC / connector','пады ставятся по прямоугольнику, который растягивается мышью':'pads are placed along a rectangle you drag with the mouse',
-  'паттерн':'pattern','выводы':'pins','число выводов':'number of pins',
+  'паттерн':'pattern','выводы':'pins','число выводов':'number of pins','Поставить':'Place',
+  'редактирование компонентов: выбор, перетаскивание, поворот, удаление':'edit components: select, move, rotate, delete','Правка (K)':'Edit (K)',
+  'ставить новые компоненты выбранного типа; Esc или повторное нажатие — закончить':'place new components of the chosen type; Esc or press again — finish',
   'Редактирование компонентов (K)':'Edit components (K)','Свойства выбранного':'Selected part','Компонент не выбран.':'No component selected.',
   'цвет компонентов top':'top component color','цвет компонентов bot':'bot component color','актив: —':'active: —',
   'экспериментально: камера / USB-микроскоп':'experimental: camera / USB microscope',
@@ -1077,7 +1082,7 @@ const ICPAT={ q4:[L('4 стороны (QFP / QFN)','4 sides (QFP / QFN)'),'QFP']
   l1:[L('в линию — разъём','in-line — connector'),'1×'] };
 const ICPATNAME=k=>(ICPAT[k]||ICPAT[k==='d2v'||k==='d2h'?'d2':''])?.[0]||'';   /* old saves: d2v / d2h */
 /* placement orientation (screen degrees, CW): rot 0 = pins on left/right (2 sides), pin 1 top-left */
-let icRot=0;
+let icRot=0, placing=false;   /* placing: «Поставить» armed inside the K mode */
 const isIC=c=>!!c.pads;
 function icLayout(pat,n,x0,y0,x1,y1){ /* screen rect -> pad screen points, CCW from pin 1 */
   const lerp=(a,b,t)=>a+(b-a)*t, f=(i,k)=>k>1?i/(k-1):.5, out=[];
@@ -1186,7 +1191,7 @@ function drawComps(){
     marks.appendChild(svg('polygon',{points:f.corners.map(q=>q.x+','+q.y).join(' '),fill:'none',stroke:'#e8b04b','stroke-width':1.2,'stroke-dasharray':'5 4'}));
     icLayout(icPat,icN(),f.x0,f.y0,f.x1,f.y1).map(f.toS).forEach((q,i)=>marks.appendChild(i===0
       ? svg('rect',{x:q.x-4,y:q.y-4,width:8,height:8,fill:'#e8b04b'}) : svg('circle',{cx:q.x,cy:q.y,r:3.5,fill:'#e8b04b'})));
-  } else if(clickMode==='comp'&&compKind==='U'&&!drag&&mouseAt) drawICCursor();
+  } else if(clickMode==='comp'&&placing&&compKind==='U'&&!drag&&mouseAt) drawICCursor();
   if(showComps) comps.forEach(c=>{
     if(!showSide[c.side])return;
     if(isIC(c)){ drawIC(c,SIDECOL[c.side],c.id===selComp); return; }
@@ -1418,7 +1423,7 @@ function rotateComp(d){
   if(clickMode==='calib'&&calib){ calib.rot=(((calib.rot||0)+d)%360+360)%360;
     compRot=calib.rot; drawMarks(); syncComps(); return; }
   const c=comps.find(o=>o.id===selComp);
-  if(clickMode==='comp'&&compKind==='U'&&(!c||(drag&&drag.t==='icrect'))){   /* placement orientation */
+  if(clickMode==='comp'&&placing&&compKind==='U'&&(!c||(drag&&drag.t==='icrect'))){   /* placement orientation */
     icRot=(((icRot+d)%360)+360)%360; drawMarks(); syncComps(); save(); return; }
   if(c&&clickMode==='comp'&&isIC(c)){ const a=d*Math.PI/180*((!!view.fh!==!!view.fv)?-1:1);   /* IC: turn pads about the body */
     c.pads.forEach(pd=>{ const v=rotV({x:pd.x-c.x,y:pd.y-c.y},a); pd.x=c.x+v.x; pd.y=c.y+v.y; });
@@ -1437,8 +1442,10 @@ function syncComps(){
   $('icPat').value=icPat; if(document.activeElement!==$('icPins')) $('icPins').value=icPins;
   $('compSize').value=compSize; $('compSide').value=compSide;
   $('compPick').disabled=!mmScale&&compKind!=='U';
+  if(clickMode!=='comp') placing=false;
+  $('compPlace').disabled=$('compPick').disabled; $('compPlace').classList.toggle('on',placing);
   $('compPick').classList.toggle('on',clickMode==='comp');
-  $('compPick').textContent=L('Редактирование компонентов (K)','Edit components (K)');
+  $('compPick').textContent=L('Правка (K)','Edit (K)');
   $('calBtn').classList.toggle('on',clickMode==='calib');
   $('calBtn').textContent=clickMode==='calib'?L('Идёт калибровка','Calibrating…'):L('Калибровать','Calibrate');
   $('calDone').disabled=clickMode!=='calib';
@@ -1456,16 +1463,15 @@ function syncComps(){
         ? L(`Кликните по плате — появится эталон ${$('calSize').value} (${g.L}×${g.W} мм), подгоните его ползунком.`,
             `Click the board — a ${$('calSize').value} gauge appears (${g.L}×${g.W} mm); fit it with the slider.`)
         : L('<span class="bad">Масштаб не задан.</span> Нажмите «Калибровать».','<span class="bad">Scale not set.</span> Press “Calibrate”.'));
-  $('compStatus').innerHTML = compKind==='U'
-    ? (clickMode==='comp'
-       ? L(`Space / Shift+Space — повернуть пиктограмму (${icRot}°, кружок — вывод 1), затем растяните рамку по крайним выводам — встанут ${icPins} падов. Пады тянутся по одному, корпус — целиком; клик по пустому — снять выбор.`,
-           `Space / Shift+Space — turn the pictogram (${icRot}°, dot — pin 1), then drag a frame over the outer pins — ${icPins} pads appear. Drag pads one by one, the body moves all; click empty — deselect.`)
-       : L('«Редактирование компонентов (K)», затем растяните прямоугольник по выводам.','“Edit components (K)”, then drag a rectangle over the pins.'))
-    : !mmScale ? L('Сначала калибровка масштаба.','Calibrate the scale first.')
-    : (clickMode==='comp'
-       ? L(`Клик по плате ставит <b>${compKind}${compSeq[compKind]}</b> · ${compSize} · ${compSide}-comp · ${compRot}°.`,
-           `A click on the board places <b>${compKind}${compSeq[compKind]}</b> · ${compSize} · ${compSide}-comp · ${compRot}°.`)
-       : L('Клик по компоненту — выбрать, перетаскивание — двигать, Space — поворот на 45°.','Click a component — select, drag — move, Space — rotate 45°.'))
+  const editTip=L('Клик по компоненту — выбрать, перетаскивание — двигать (пад IC — отдельно), Space — поворот на 45°, клик по пустому — снять выбор. Новые — кнопка «Поставить».',
+    'Click a component — select, drag — move (an IC pad on its own), Space — rotate 45°, click empty — deselect. New parts — “Place”.');
+  $('compStatus').innerHTML = (compKind!=='U'&&!mmScale) ? L('Сначала калибровка масштаба.','Calibrate the scale first.')
+    : !(clickMode==='comp'&&placing) ? editTip
+    : compKind==='U'
+       ? L(`Space / Shift+Space — повернуть пиктограмму (${icRot}°, кружок — вывод 1), затем растяните рамку по крайним выводам — встанут ${icPins} падов. Esc — закончить.`,
+           `Space / Shift+Space — turn the pictogram (${icRot}°, dot — pin 1), then drag a frame over the outer pins — ${icPins} pads appear. Esc — finish.`)
+       : L(`Клик по плате ставит <b>${compKind}${compSeq[compKind]}</b> · ${compSize} · ${compSide}-comp · ${compRot}°. Esc — закончить.`,
+           `A click on the board places <b>${compKind}${compSeq[compKind]}</b> · ${compSize} · ${compSide}-comp · ${compRot}°. Esc — finish.`)
        + (clickMode==='move'||clickMode==='crop' ? L('<br><b>Режим правки слоя</b> — компоненты сейчас не ловятся.','<br><b>Layer edit mode</b> — components are not picked now.') : '');
 }
 /* ---------- layer cards ---------- */
@@ -2098,7 +2104,7 @@ vp.addEventListener('pointerdown',e=>{
       drag={t:'comp',id:hc.id,x:e.clientX,y:e.clientY,moved:false,ox:hc.x,oy:hc.y,
         pads:hc.pads?hc.pads.map(pd=>({x:pd.x,y:pd.y})):null};
       vp.setPointerCapture(e.pointerId); return; }
-    if(clickMode==='comp'&&compKind==='U'){ const q=evXY(e);   /* drag a rectangle over the part's pins */
+    if(clickMode==='comp'&&placing&&compKind==='U'){ const q=evXY(e);   /* drag a rectangle over the part's pins */
       drag={t:'icrect',x:e.clientX,y:e.clientY,moved:false,sx:q.x,sy:q.y,ex:q.x,ey:q.y};
       vp.setPointerCapture(e.pointerId); return; }
   }
@@ -2115,7 +2121,7 @@ vp.addEventListener('pointermove',e=>{
       if(h==='sx'||h==='sy'){ const q=layerBox(sel_()).q, v=h==='sx'?{x:q[1].x-q[0].x,y:q[1].y-q[0].y}:{x:q[3].x-q[0].x,y:q[3].y-q[0].y};
         c=Math.abs(v.x)>=Math.abs(v.y)?'ew-resize':'ns-resize'; }
       vp.style.cursor=c; }
-    if(clickMode==='comp'&&compKind==='U'){ mouseAt={clientX:e.clientX,clientY:e.clientY}; drawMarks(); }
+    if(clickMode==='comp'&&placing&&compKind==='U'){ mouseAt={clientX:e.clientX,clientY:e.clientY}; drawMarks(); }
     if(clickMode==='crop'){ const h=sel_()&&hitCropBox(e);
       vp.style.cursor=!h?'':h.ex==='in'?'move':(h.ex&&h.ey)?'nwse-resize':h.ex?'ew-resize':'ns-resize'; }
     return; }
@@ -2191,7 +2197,8 @@ vp.addEventListener('pointerup',e=>{
   if(clickMode==='comp'){
     const hc=hitComp(m);
     if(hc){ selComp=hc.id; renderComps(); }
-    else addComp(m);
+    else if(placing) addComp(m);
+    else if(selComp){ selComp=null; renderComps(); }   /* edit mode: click on empty deselects */
     drawMarks(); syncComps(); return;
   }
   if(clickMode==='none'){
@@ -2350,8 +2357,12 @@ $('icPat').onchange=e=>{icPat=e.target.value;syncComps();save()};
 $('icPins').onchange=e=>{ icPins=Math.max(1,Math.min(400,parseInt(e.target.value,10)||8)); syncComps(); save(); };
 $('compSize').onchange=e=>{compSize=e.target.value;syncComps();save()};
 $('compSide').onchange=e=>{compSide=e.target.value;syncComps();save()};
-$('compPick').onclick=()=>{ clickMode=clickMode==='comp'?'none':'comp';
+$('compPick').onclick=()=>{ clickMode=clickMode==='comp'?'none':'comp'; placing=false;
   if(clickMode==='comp'){calib=null;showComps=true;} sync();syncComps();drawMarks(); };
+$('compPlace').onclick=()=>{ placing=!placing;
+  if(placing&&clickMode!=='comp'){ clickMode='comp'; calib=null; showComps=true; }
+  if(placing) selComp=null;   /* Space turns the new part's pictogram, not the last one */
+  renderComps(); sync(); syncComps(); drawMarks(); };
 $('calBtn').onclick=()=>{ if(clickMode==='calib'){clickMode='none';calib=null;}
   else {clickMode='calib'; if(!mmScale) mmScale=sliderToScale(+$('calRange').value);}
   sync();syncComps();drawMarks(); };
@@ -2464,7 +2475,8 @@ addEventListener('keydown',e=>{
     case 'm':case 'M':case 'ь':case 'Ь':if(!$('moveBtn').disabled)$('moveBtn').click();return;
     case 'f':case 'F':case 'а':case 'А':flipBoard();return;
     case ' ':case 'Spacebar':e.preventDefault();rotateComp(e.shiftKey?-45:45);return;
-    case 'Escape':clickMode='none';pending=null;calib=null;hlNet=null;renderNets();sync();drawMarks();return;
+    case 'Escape': if(placing){ placing=false; syncComps(); drawMarks(); return; }   /* first Esc ends placing, stays in K */
+      clickMode='none';pending=null;calib=null;hlNet=null;renderNets();sync();drawMarks();return;
     case 'z':case 'Z':case 'я':case 'Я':if(!$('undoPt').disabled)$('undoPt').click();return;
     case 'ArrowLeft':case 'ArrowRight':case 'ArrowUp':case 'ArrowDown':{
       const v={ArrowLeft:{x:-st,y:0},ArrowRight:{x:st,y:0},
