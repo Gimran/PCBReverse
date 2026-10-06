@@ -21,6 +21,7 @@ SMD-компонентов. Выросло из проекта GN1144 (SFP+ 10G)
 | `tests/test_project.pcbr.js` | демо-проект для первого запуска = test_project.pcbr в base64; генерируется `node tests/make_demo.js` |
 | `pcb_overlay_state.json` | старое рабочее состояние (JSON, не в git) |
 | `backups/` | предыдущие версии страницы |
+| `package.json` | только dev-зависимость playwright (приложению сборка не нужна), `node_modules/` в .gitignore |
 | `tests/smoke.js` | Playwright-смоук: `node tests/smoke.js [project.pcbr]` (по умолчанию `tests/test_project.pcbr`) |
 | `README.md` / `README.ru.md` | README английский (основной) / русский, ссылки друг на друга вверху |
 | `docs/*_en.jpg`, `docs/*.jpg` | скриншоты для README EN / RU; пересъёмка: `python -m http.server 8765` + `node tests/shots.mjs docs` (headless Chrome по CDP) |
@@ -161,7 +162,7 @@ SMD-компонентов. Выросло из проекта GN1144 (SFP+ 10G)
   вход в режим N / K включает соответствующее.
 - Вкладка NETS: верхний блок (режим N, статус, кнопки «+ NET / − точка / очистить / подписи» в один ряд) закреплён
   (`position:sticky`) при прокрутке списка.
-- Фокус NET (`hlNet`, в `drawMarks` — `fNet`): слои в градациях серого (`#stack.gray`), компоненты и прочие NET — серые
+- Фокус NET (`hlNet`, в `drawMarks` — `fNet`): слои в градациях серого (`#stack.gray .clip`; не на самом #stack — filter делает его containing block и слои съезжают), компоненты и прочие NET — серые
   (SVG-элементы с `style.filter`, кроме помеченных `data-hot` — пады этого NET); точки NET видны и с другой стороны
   (пунктирное кольцо); звезда линий от выбранной точки (иначе ближайшей к центру) ко всем остальным точкам NET.
 - Без режима (`none`) клик мимо точки NET снимает подсветку (`hlNet`) и выбор точки; активный NET остаётся.
@@ -244,7 +245,8 @@ SMD-компонентов. Выросло из проекта GN1144 (SFP+ 10G)
 ## Как вносить правки
 1. Бэкап в `backups/` перед заметной переделкой UI или логики. Новые строки UI — на двух языках (см. «Язык интерфейса»).
 2. Правка → `node -e` синтаксис-проверка скрипта → `node tests/smoke.js` (грузит `tests/test_project.pcbr`).
-   Playwright локально не установлен (`npm i -D playwright`); без него — те же проверки в браузерной панели через
+   Playwright установлен (`package.json` — только dev-инструменты, `npm run smoke`; на новой машине `npm i` +
+   `npx playwright install chromium`). «L8-» в смоуке — видеослой, картинки у него нет, это норма. Дополнительно — проверки в браузерной панели через
    `python -m http.server` и `loadProject(new File([await (await fetch('tests/test_project.pcbr')).blob()],'test_project.pcbr'))`.
 3. Для UI — один скриншот области через Playwright и взгляд на него перед сдачей.
 4. Проверять на `tests/test_project.pcbr`, а не только на пустой странице.

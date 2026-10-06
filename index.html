@@ -149,7 +149,7 @@ button.wide{width:100%}
   border-radius:3px;background:var(--panel);color:var(--text)}
 .xbox.on{background:var(--text);border-color:var(--text);color:var(--panel)}
 .xbox.on button{color:var(--panel)}
-#stack.gray{filter:grayscale(1)}
+#stack.gray .clip{filter:grayscale(1)}   /* not on #stack: a filter makes it the containing block and the layers jump */
 .lhead{display:flex;align-items:center;gap:5px;padding:5px 6px 4px;cursor:pointer}
 .layer{cursor:pointer}
 .lhead .lname{flex:1;min-width:0;padding:2px 3px;font-size:13px}

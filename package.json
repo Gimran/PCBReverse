@@ -1,0 +1,11 @@
+{
+  "name": "pcbreverse",
+  "private": true,
+  "description": "PCB reverse-engineering overlay — dev tooling only (the app itself needs no build)",
+  "scripts": {
+    "smoke": "node tests/smoke.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
