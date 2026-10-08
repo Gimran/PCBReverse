@@ -61,8 +61,12 @@ h1{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-weight:
 .lbox video{display:block;width:100%;height:auto;pointer-events:none}
 .lbox img{display:block;width:100%;height:auto;pointer-events:none;
   user-select:none;-webkit-user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
-@keyframes blinkfade{0%,100%{opacity:var(--op,1)}50%{opacity:calc(var(--op,1) * .12)}}
-.lbox.blink{animation:blinkfade 1.1s ease-in-out infinite}
+/* pulse: holds at both ends (30% of the period each) with eased cross-fades between — each state can be looked at,
+   no constant flicker. --phi / --plo set per layer (updateBlink), period --pulseT from the VIEW tab */
+@keyframes pulse{0%,30%,100%{opacity:var(--phi,1)}50%,80%{opacity:var(--plo,0)}}
+.lbox.pulse{animation:pulse var(--pulseT,2s) ease-in-out infinite}
+.val.pz,.lsep .gv{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.val.pz.pulsing,.lsep .gv.pulsing{color:var(--ok);text-decoration-style:solid}
 /* no prefers-reduced-motion override: blinking is an explicit tool, toggled by the «мигание» button */
 svg.marks{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:visible}
 .hud{position:absolute;left:12px;bottom:12px;display:flex;gap:6px;flex-wrap:wrap;z-index:21;

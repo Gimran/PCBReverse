@@ -52,6 +52,8 @@
             <button class="mini" id="invBtn">инверсия цветов</button>
             <button class="mini" id="grayBtn" title="все слои в градациях серого — разметка остаётся цветной">градации серого</button>
           </div>
+          <div class="row" title="период плавного мигания: клик по значению прозрачности (слой, сторона, видео) и опорные точки"><span class="lbl" style="flex:none">мигание</span>
+            <input type="range" id="pulseT" min="0.6" max="5" step="0.1" value="2"><span class="val" id="pulseTV">2.0 s</span></div>
         </div>
         <div class="sect">
           <div class="lbl">Состояние</div>
@@ -286,7 +288,7 @@
             <select id="refSel" class="slim"></select></div>
           <div class="actl" title="настройки активного слоя">
             <div class="row"><span class="lbl alab">α</span>
-              <input type="range" id="aOp" min="0" max="100" value="100"><span class="val" id="aOpV">100%</span>
+              <input type="range" id="aOp" min="0" max="100" value="100"><span class="val pz" id="aOpV" title="клик — плавное мигание активного слоя (100% ⇄ 0)">100%</span>
               <select id="aBlend" class="slim mini-sel"></select></div>
             <div class="abtn"><button class="mini" id="aFh" title="отразить по горизонтали">⇄</button>
               <button class="mini" id="aFv" title="отразить по вертикали">⇅</button></div>

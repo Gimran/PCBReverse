@@ -3,7 +3,7 @@
    View and tool settings (UI_KEYS) are not part of the document: undo keeps the current view, zoom, side, tools. */
 const HIST_MAX=10;
 const UI_KEYS=['count','sel','refId','viewMode','swipe','view','boardSide','xray','inverted','grayView','grid','labels',
-  'blinkOn','tintMode','activeNet','compKind','compSize','compSide','compRot','icPat','icPins','sotPat','icRot','icPin0',
+  'blinkOn','pulseT','tintMode','activeNet','compKind','compSize','compSide','compRot','icPat','icPins','sotPat','icRot','icPin0',
   'compVal','sideOp','xrayOp','showSide','showNets','showComps','showDraw','drawStyle','warpModel','imgDir','projName'];
 let hUndo=[], hRedo=[], hCur=null, hKey=null;   /* stacks of document JSON; hCur — the document as last saved, hKey — its
                                                    comparison key (without l.file: the folder's file names are bookkeeping) */

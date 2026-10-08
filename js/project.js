@@ -10,7 +10,7 @@ const ik=id=>scope?scope+'/'+id:id;           /* IndexedDB key of a layer image 
 function setScope(s){ scope=s||''; try{ sessionStorage.setItem(SCOPEKEY,scope); localStorage.setItem(LASTSCOPE,scope); }catch(err){} }
 function snapshot(){
   return {v:4, count:layers.length, sel, refId, viewMode, swipe, view, boardSide, xray,
-    inverted, grayView, grid, labels, blinkOn, tintMode,
+    inverted, grayView, grid, labels, blinkOn, pulseT, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.tc,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
       tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe,file:l.file||''})),
@@ -51,7 +51,7 @@ function restoreState(s){ /* everything but building the layers */
   viewMode=s.viewMode||'all'; swipe=typeof s.swipe==='number'?s.swipe:.5;
   boardSide=s.boardSide==='bot'?'bot':'top'; xray=!!s.xray;
   view=Object.assign({x:0,y:0,z:1,rot:0,fh:false,fv:false},s.view||{}); inverted=!!s.inverted; grayView=!!s.grayView; grid=s.grid!==false; labels=s.labels!==false;
-  blinkOn=s.blinkOn!==false; tintMode=s.tintMode||'color';
+  blinkOn=s.blinkOn!==false; tintMode=s.tintMode||'color'; pulseT=+s.pulseT>0?+s.pulseT:2;
   nets=s.nets||[]; points=s.points||[];
   activeNet=s.activeNet||(nets[0]?nets[0].id:null); netSeq=s.netSeq||nets.length+1;
   comps=Array.isArray(s.comps)?s.comps:[]; mmScale=+s.mmScale||0;

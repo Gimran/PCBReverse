@@ -23,7 +23,10 @@ const I18N={
   'Сохранить сейчас':'Save now',
   'пустой проект: слои TOP main / BOT main без картинок; текущие слои, картинки, NET и компоненты удаляются из браузера (с подтверждением)':
     'empty project: TOP main / BOT main layers without images; current layers, images, NETs and components are removed from the browser (asks first)',
-  'Новый проект':'New project','Папка':'Folder','Рабочая папка…':'Working folder…','Подключить':'Connect','Отключить':'Disconnect',
+  'Новый проект':'New project',
+  'клик — плавное мигание активного слоя (100% ⇄ 0)':'click — smooth blinking of the active layer (100% ⇄ 0)',
+  'период плавного мигания: клик по значению прозрачности (слой, сторона, видео) и опорные точки':
+    'smooth blinking period: a click on an opacity value (layer, side, video) and the reference points','Папка':'Folder','Рабочая папка…':'Working folder…','Подключить':'Connect','Отключить':'Disconnect',
   'рабочая папка проекта: project.json + images/; пустая — текущий проект запишется в неё, с проектом — он откроется; дальше всё сохраняется туда само':
     'project working folder: project.json + images/; an empty one gets the current project, one with a project opens it; then everything is saved there by itself',
   'браузер спрашивает доступ к папке один раз за сессию':'the browser asks for folder access once per session',

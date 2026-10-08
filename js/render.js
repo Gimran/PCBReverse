@@ -88,10 +88,26 @@ function applyView(){
     (view.fh?' · ⇄':'')+(view.fv?' · ⇅':'');
   drawMarks(); save();
 }
+/* smooth blinking: a click on an opacity value (layer α, side group, video α) sweeps that value 100% -> 0 and back;
+   in the reference-point mode the layer waiting for a click blinks down to 12% (keeps the context) */
+let pulse=null, pulseT=2;   /* pulse: {k:'layer',id} | {k:'side',side}; pulseT — period, s (VIEW tab) */
+function pulseRange(l,target){
+  if(!layerShown(l)) return null;
+  if(pulse&&pulse.k==='layer'&&pulse.id===l.id) return [1, 0];   /* full range, whatever the side factor (XRAY) */
+  if(pulse&&pulse.k==='side'&&pulse.side===l.side) return [l.op, 0];
+  if(l.id===target){ const o=effOpacity(l); return [o, o*.12]; }
+  return null;
+}
 function updateBlink(){
   const target=(blinkOn&&clickMode==='align') ? (pending? refId : sel) : null;
-  layers.forEach(l=>l.box.classList.toggle('blink',l.id===target&&l.on));
+  document.documentElement.style.setProperty('--pulseT',pulseT+'s');
+  layers.forEach(l=>{ const r=pulseRange(l,target); l.box.classList.toggle('pulse',!!r);
+    if(r){ l.box.style.setProperty('--phi',r[0]); l.box.style.setProperty('--plo',r[1]); } });
+  $('aOpV').classList.toggle('pulsing',!!(pulse&&pulse.k==='layer'&&pulse.id===sel));
+  document.querySelectorAll('.lsep .gv').forEach(v=>v.classList.toggle('pulsing',!!(pulse&&pulse.k==='side'&&pulse.side===v.dataset.side)));
+  document.querySelectorAll('.val.pz[data-lid]').forEach(v=>v.classList.toggle('pulsing',!!(pulse&&pulse.k==='layer'&&pulse.id===v.dataset.lid)));
 }
+function togglePulse(p){ pulse=(pulse&&p&&pulse.k===p.k&&pulse.id===p.id&&pulse.side===p.side)?null:p; updateBlink(); }
 const vrad=()=>view.rot*Math.PI/180;
 const rotV=(v,a)=>{const c=Math.cos(a),s=Math.sin(a);return{x:v.x*c-v.y*s,y:v.x*s+v.y*c};};
 const vsx=()=>view.z*(view.fh?-1:1), vsy=()=>view.z*(view.fv?-1:1);

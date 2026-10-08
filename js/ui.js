@@ -413,6 +413,8 @@ function syncActl(){ const l=sel_(), ids=['aOp','aBlend','aTc','aTn','aTm','aFh'
   $('aTm').value=l.tm||tintMode;
   $('aFh').classList.toggle('on',!!l.fh); $('aFv').classList.toggle('on',!!l.fv); }
 const actl=fn=>()=>{ const l=sel_(); if(l) fn(l); };
+$('aOpV').onclick=()=>{ if(sel_()) togglePulse({k:'layer',id:sel}); };
+$('pulseT').oninput=()=>{ pulseT=+$('pulseT').value; $('pulseTV').textContent=pulseT.toFixed(1)+' s'; updateBlink(); save(); };
 $('aOp').oninput=actl(l=>{ l.op=$('aOp').value/100; $('aOpV').textContent=$('aOp').value+'%'; applyLayer(l); renderVideo(); });
 $('aBlend').onchange=actl(l=>{ l.blend=$('aBlend').value; applyLayer(l); save(); });
 $('aTc').oninput=actl(l=>{ l.tc=l.color=$('aTc').value; applyTint(l); save();   /* layer colour = tint colour */
@@ -493,7 +495,7 @@ addEventListener('keydown',e=>{
     case 'Escape': if(clickMode==='pedit'){ endPartEdit(); return; }
       if(mergeFrom){ hlNet=mergeFrom; mergeFrom=null; renderNets(); drawMarks(); sync(); return; }
       if(placing){ placing=false; syncComps(); drawMarks(); return; }   /* first Esc ends placing, stays in K */
-      clickMode='none';pending=null;calib=null;hlNet=null;renderNets();sync();drawMarks();return;
+      clickMode='none';pending=null;calib=null;hlNet=null;pulse=null;renderNets();sync();drawMarks();return;
     case 'z':case 'Z':case 'я':case 'Я':if(!$('undoPt').disabled)$('undoPt').click();return;
     case 'ArrowLeft':case 'ArrowRight':case 'ArrowUp':case 'ArrowDown':{
       const v={ArrowLeft:{x:-st,y:0},ArrowRight:{x:st,y:0},

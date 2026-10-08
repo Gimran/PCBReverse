@@ -32,7 +32,9 @@ function renderCards(){
         const r=document.createElement('input'); r.type='range'; r.min=0; r.max=100; r.value=Math.round(sideOp[sd]*100);
         r.title=L('прозрачность всех слоёв стороны (умножается на α слоя); двойной клик — 100%',
                   'opacity of all layers of the side (multiplies the layer α); double-click — 100%');
-        const v=document.createElement('span'); v.className='gv'; v.textContent=r.value+'%';
+        const v=document.createElement('span'); v.className='gv'; v.textContent=r.value+'%'; v.dataset.side=sd;
+        v.title=L('клик — плавное мигание стороны (100% ⇄ 0)','click — smooth blinking of the side (100% ⇄ 0)');
+        v.onclick=()=>togglePulse({k:'side',side:sd});
         r.oninput=()=>{ sideOp[sd]=r.value/100; v.textContent=r.value+'%'; applySideOp(sd); };
         r.ondblclick=()=>{ r.value=100; r.oninput(); };
         sp.append(ln,r,v); }
@@ -127,6 +129,8 @@ function renderVideo(){
     if(lab==='α'){ a.style.textTransform='none'; a.style.fontSize='12px'; }
     const i=document.createElement('input'); i.type='range'; i.min=0; i.max=max; i.value=val;
     const vv=document.createElement('span'); vv.className='val'; vv.textContent=val+'%';
+    if(lab==='α'){ vv.classList.add('pz'); vv.dataset.lid=l.id; vv.onclick=()=>togglePulse({k:'layer',id:l.id});
+      vv.title=L('клик — плавное мигание (100% ⇄ 0)','click — smooth blinking (100% ⇄ 0)'); }
     i.oninput=()=>{ vv.textContent=i.value+'%'; fn(+i.value); }; r.append(a,i,vv); return r; };
   const ra=sl('α',Math.round(l.op*100),100,L('непрозрачность видео','video opacity'),x=>{ l.op=x/100; applyLayer(l); });
   const rf=sl(L('края','edges'),Math.round((l.fe||0)*100),50,L('размытие краёв кадра (участок задаёт кроп); переходит в снимок','frame edge feathering (area set by the crop); carried into the snapshot'),

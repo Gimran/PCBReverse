@@ -91,5 +91,6 @@ function sync(){
   $('vflipH').classList.toggle('on',!!view.fh); $('vflipV').classList.toggle('on',!!view.fv);
   const rs=$('refSel'); if(rs.value!==refId) rs.value=refId||'';
   syncComps();
+  if(document.activeElement!==$('pulseT')){ $('pulseT').value=pulseT; $('pulseTV').textContent=pulseT.toFixed(1)+' s'; }
   updateBlink();
 }
