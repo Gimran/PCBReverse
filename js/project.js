@@ -71,6 +71,7 @@ function restoreState(s){ /* everything but building the layers */
   if(typeof s.projName==='string'&&s.projName) projName=s.projName;
   /* old saves kept only the bare file name for files picked via dialog */
   layers.forEach(l=>{ if(l.stored && l.src && !/[\/\\]/.test(l.src)) l.src=dirJoin(imgDir,l.src); });
+  applyZ();   /* drawing order needs boardSide, set above */
 }
 /* browser copy of a layer image: original blob in IndexedDB; older saves kept a webp in localStorage */
 function setBlobSrc(l,b){ if(l.url) URL.revokeObjectURL(l.url); l.url=URL.createObjectURL(b); l.el.src=l.url;

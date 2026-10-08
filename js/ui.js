@@ -305,7 +305,7 @@ function flipBoard(){
   if(vis.length && !vis.some(l=>l.on)) { /* nothing visible on this side — leave as is */ }
   if(!byId(sel)||effOpacity(byId(sel))===0){ const c=vis.find(l=>l.on); if(c)sel=c.id; }
   if(refId===sel){ const o=layers.find(l=>l.id!==sel); if(o)refId=o.id; }
-  applyView(); applyAll(); renderCards(); renderComps(); renderVideo(); sync(); save();
+  applyZ(); applyView(); applyAll(); renderCards(); renderComps(); renderVideo(); sync(); save();
 }
 $('flipBoard').onclick=flipBoard;
 $('xrayBtn').onclick=()=>{
@@ -406,8 +406,8 @@ function syncActl(){ const l=sel_(), ids=['aOp','aBlend','aTc','aTn','aTm','aFh'
   ids.forEach(i=>$(i).disabled=!l); if(!l) return;
   const keep=i=>document.activeElement!==$(i);
   if(keep('aOp')) $('aOp').value=Math.round(l.op*100); $('aOpV').textContent=Math.round(l.op*100)+'%';
-  $('aBlend').value=l.blend; $('aBlend').disabled=idx(l.id)===0;
-  $('aBlend').title=idx(l.id)===0?L('нижний слой смешивать не с чем','the bottom layer has nothing to blend with'):L('режим наложения на нижележащие слои','blend mode over the layers below');
+  $('aBlend').value=l.blend; $('aBlend').disabled=isBottom(l);
+  $('aBlend').title=isBottom(l)?L('нижний слой смешивать не с чем','the bottom layer has nothing to blend with'):L('режим наложения на нижележащие слои','blend mode over the layers below');
   if(keep('aTc')) $('aTc').value=l.tc;
   if(keep('aTn')) $('aTn').value=Math.round(l.tn*100); $('aTnV').textContent=Math.round(l.tn*100)+'%';
   $('aTm').value=l.tm||tintMode;

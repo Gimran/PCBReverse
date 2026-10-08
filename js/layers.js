@@ -65,8 +65,15 @@ function restack(){
   const kids=layers.filter(l=>parentOf(l)), tops=layers.filter(l=>!parentOf(l)), out=[];
   tops.forEach(t=>{ out.push(t); kids.filter(k=>k.parent===t.id).forEach(k=>out.push(k)); });
   layers=[...out.filter(l=>l.kind!=='video'),...out.filter(l=>l.kind==='video')];
-  layers.forEach((l,i)=>{ l.clip.style.zIndex=i+1; stack.appendChild(l.clip); });
+  applyZ();
 }
+/* drawing order follows the side in view: the near side on top, the far side under it, «обе» at the bottom, video above
+   all; the layers array (and the list in СЛОИ) keeps TOP above BOT. Under XRAY from BOT the translucent BOT is then
+   really in front of the opaque TOP. */
+function viewOrder(){ const rk=l=>l.kind==='video'?3:l.side==='any'?0:l.side===boardSide?2:1;
+  return layers.map((l,i)=>[l,i]).sort((a,b)=>rk(a[0])-rk(b[0])||a[1]-b[1]).map(x=>x[0]); }
+const isBottom=l=>viewOrder()[0]===l;
+function applyZ(){ viewOrder().forEach((l,i)=>{ l.clip.style.zIndex=i+1; stack.appendChild(l.clip); }); }
 function layersChanged(){
   restack();
   if(!byId(sel)) sel=layers[layers.length-1].id;

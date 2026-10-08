@@ -62,7 +62,7 @@ function applyLayer(l){
   const o=effOpacity(l);
   l.box.style.setProperty('--op',o); l.box.style.opacity=o;
   l.box.style.filter=inverted?'invert(1) hue-rotate(180deg)':'none';
-  l.clip.style.mixBlendMode = (idx(l.id)===0)?'normal':l.blend;
+  l.clip.style.mixBlendMode = isBottom(l)?'normal':l.blend;
   applyTint(l);
   const s=byId(sel);
   if(s && s!==l && s.H && s.pairs.some(pr=>pr.rl===l.id)) recompute(false);
