@@ -23,7 +23,11 @@ const I18N={
   'Сохранить сейчас':'Save now',
   'пустой проект: слои TOP main / BOT main без картинок; текущие слои, картинки, NET и компоненты удаляются из браузера (с подтверждением)':
     'empty project: TOP main / BOT main layers without images; current layers, images, NETs and components are removed from the browser (asks first)',
-  'Новый проект':'New project',
+  'Новый проект':'New project','Папка':'Folder','Рабочая папка…':'Working folder…','Подключить':'Connect','Отключить':'Disconnect',
+  'рабочая папка проекта: project.json + images/; пустая — текущий проект запишется в неё, с проектом — он откроется; дальше всё сохраняется туда само':
+    'project working folder: project.json + images/; an empty one gets the current project, one with a project opens it; then everything is saved there by itself',
+  'браузер спрашивает доступ к папке один раз за сессию':'the browser asks for folder access once per session',
+  'больше не сохранять в папку (проект в ней остаётся)':'stop saving to the folder (the project stays there)',
   'Выравнивание активного слоя':'Active layer alignment','угол':'angle','угол, °; Enter — применить':'angle, °; Enter — apply',
   'масшт':'scale','масштаб; Enter — применить':'scale; Enter — apply',
   'рамка: масштаб / вращение (клик по слою переключает), ⊕ — центр, внутри — сдвиг':'frame: scale / rotate (click the layer to toggle), ⊕ — pivot, inside — move',

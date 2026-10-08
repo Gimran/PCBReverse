@@ -441,7 +441,7 @@ $('fileProj').onchange=e=>{ const f=e.target.files[0]; e.target.value=''; if(f) 
 $('missPick').onclick=()=>$('fileMany').click();
 $('missSkip').onclick=()=>saveProject(true);
 $('fileMany').onchange=e=>{ const fs=[...e.target.files]; e.target.value=''; if(fs.length) pickMissing(fs); };
-$('saveNow').onclick=()=>{booted=true;save()};
+$('saveNow').onclick=()=>{booted=true;saveNow(); if(workDirOk){ clearTimeout(dirTimer); writeDirQ(); }};
 $('newProj').onclick=()=>{
   const n=layers.filter(l=>l.src||l.stored).length;
   if(!confirm(L('Новый проект?\n\nИз браузера будут удалены: слои ('+layers.length+', с картинками '+n+'), NET ('+nets.length+
@@ -452,12 +452,15 @@ $('newProj').onclick=()=>{
   localStorage.removeItem(KEY);
   layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
   try{ sessionStorage.setItem(NEWKEY,'1'); }catch(err){}
-  idb.clear().catch(()=>{}).then(()=>location.reload()); };
+  setDirty(false);   /* a new project is not the working folder's one: forget the folder */
+  Promise.all([idb.clear().catch(()=>{}),idb.meta.del('workDir').catch(()=>{})]).then(()=>location.reload()); };
 
 addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
   const st=e.shiftKey?10:1, s=sel_(); let h=true;
   if(e.altKey&&e.code==='KeyA'){ e.preventDefault(); startMerge(); return; }   /* Alt+A: assign NET */
+  if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.code==='KeyZ'||e.code==='KeyY')){ e.preventDefault();   /* undo / redo */
+    if(e.code==='KeyY'||e.shiftKey) redo(); else undo(); return; }
   if(/^[1-8]$/.test(e.key)){ const l=layers[parseInt(e.key,10)-1];
     if(l){l.on=!l.on;renderCards();applyAll();sync()} e.preventDefault(); return; }
   switch(e.key){

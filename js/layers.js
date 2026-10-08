@@ -6,7 +6,7 @@ function mkLayer(i,init){
     id, name:L('Слой ','Layer ')+(i+1), color:LAYPAL[i%LAYPAL.length], side:'any',
     src:'', stored:false, ok:false,
     x:0,y:0,rot:0,scale:1,sx:1,sy:1,fh:false,fv:false,op:1,on:true,H:null,
-    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15, cor:{...COR0}, crop:null, main:false, parent:null, fe:0,
+    tc:LAYPAL[i%LAYPAL.length], tn:0, tm:null, blend:'normal', kOn:false, kc:'#ffffff', kt:.15, cor:{...COR0}, crop:null, main:false, parent:null, fe:0, file:'',
     w:1200,h:1200, pairs:[]
   },init||{});
   const clip=document.createElement('div'); clip.className='clip'; clip.dataset.id=id;

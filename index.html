@@ -56,6 +56,12 @@
         <div class="sect">
           <div class="lbl">Состояние</div>
           <div class="status" id="saveStatus">Автосохранение включено.</div>
+          <div class="row"><span class="lbl" style="flex:none">Папка</span><span class="val" id="dirName" style="flex:1;text-align:left"></span></div>
+          <div class="modes two">
+            <button class="mini" id="dirPick" title="рабочая папка проекта: project.json + images/; пустая — текущий проект запишется в неё, с проектом — он откроется; дальше всё сохраняется туда само">Рабочая папка…</button>
+            <button class="mini" id="dirConnect" hidden title="браузер спрашивает доступ к папке один раз за сессию">Подключить</button>
+            <button class="mini" id="dirOff" hidden title="больше не сохранять в папку (проект в ней остаётся)">Отключить</button>
+          </div>
           <div class="row" id="missRow" hidden>
             <button class="mini" id="missPick" style="flex:1">Указать файлы…</button>
             <button class="mini" id="missSkip" style="flex:1">Сохранить без них</button>
@@ -158,6 +164,7 @@
             <b>Alt+клик</b> в режиме N — переходное отверстие (точка на обеих сторонах)<br>
             <b>Ctrl+клик</b> в режиме N — новый NET с первой точкой-via (сквозной), сразу ввод имени<br>
             <b>Alt+A</b> — выделенный NET объединить с другим: клик по его точке или строке в списке (Esc — отмена)<br>
+            <b>Ctrl+Z</b> — отменить (10 шагов) · <b>Ctrl+Y</b> / <b>Ctrl+Shift+Z</b> — повторить<br>
             <b>Space</b> / <b>Shift+Space</b> — поворот компонента 45°<br><b>Delete</b> — удалить выделенное (точку, компонент, рисунок) · <b>Esc</b> — выход
           </div>
           <div class="keys" data-only="en">
@@ -171,6 +178,7 @@
             <b>Alt+click</b> in N mode — via (point on both sides)<br>
             <b>Ctrl+click</b> in N mode — new NET whose first point is a via, then type its name<br>
             <b>Alt+A</b> — merge the highlighted NET into another: click its point or its row in the list (Esc — cancel)<br>
+            <b>Ctrl+Z</b> — undo (10 steps) · <b>Ctrl+Y</b> / <b>Ctrl+Shift+Z</b> — redo<br>
             <b>Space</b> / <b>Shift+Space</b> — rotate component 45°<br><b>Delete</b> — delete the selection (point, component, drawing) · <b>Esc</b> — exit mode
           </div>
         </div>
@@ -250,6 +258,7 @@
       <span id="hudSel">актив: —</span>
       <span id="hudXf"></span>
       <span id="hudCue" class="cue" hidden></span>
+      <span id="hudToast" class="cue" hidden></span>
     </div>
   </div>
 
@@ -345,6 +354,8 @@
 <script src="js/nets.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/project.js"></script>
+<script src="js/history.js"></script>
+<script src="js/workdir.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/boot.js"></script>
 </body>

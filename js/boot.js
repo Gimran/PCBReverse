@@ -9,7 +9,7 @@ if(!restored){   /* «Новый проект» / first start: empty main layers
 }
 loadImages(); renderCards(); renderFiles(); renderNets(); renderComps(); applyAll();
 if(restored) applyView(); else fit();
-sync(); checkMissing(); booted=true;
+sync(); checkMissing(); booted=true; histReset(); initWorkDir();
 if(fresh&&!restored) save(true);   /* persist the empty project, else a reload brings the demo back */
 $('saveStatus').innerHTML= restored? L('Состояние восстановлено.','State restored.') : L('Автосохранение включено.','Autosave is on.');
 /* first start (nothing saved, not «Новый проект»): open the demo project from the repo. A file:// page cannot fetch(),
@@ -27,6 +27,6 @@ function loadDemo(){
 }
 if(!restored&&!fresh&&!/[?&]nodemo\b/.test(location.search)) loadDemo();
 $('langBtn').textContent=L('EN','RU'); $('langBtn').title=L('Switch to English','Переключить на русский');
-$('langBtn').onclick=()=>{ clearTimeout(saveTimer);   /* save now, then reload in the other language */
-  try{ localStorage.setItem(KEY,JSON.stringify(snapshot())); localStorage.setItem(LANGKEY,L('en','ru')); }catch(err){}
+$('langBtn').onclick=()=>{ saveNow(true);   /* save now (marks the working folder dirty), then reload in the other language */
+  try{ localStorage.setItem(LANGKEY,L('en','ru')); }catch(err){}
   location.reload(); };

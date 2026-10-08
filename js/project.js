@@ -5,19 +5,27 @@ function snapshot(){
     inverted, grayView, grid, labels, blinkOn, tintMode,
     layers:layers.map(l=>({id:l.id,name:l.name,color:l.tc,side:l.side,src:l.src,stored:l.stored,
       x:l.x,y:l.y,rot:l.rot,scale:l.scale,sx:l.sx,sy:l.sy,fh:l.fh,fv:l.fv,op:l.op,on:l.on,H:l.H,
-      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe})),
+      tc:l.tc,tn:l.tn,tm:l.tm||tintMode,blend:l.blend,pairs:l.pairs,kOn:l.kOn,kc:l.kc,kt:l.kt,cor:l.cor,crop:l.crop,kind:l.kind,camId:l.camId,vmode:l.vmode,main:l.main,parent:l.parent,fe:l.fe,file:l.file||''})),
     nets, points, activeNet, netSeq,
     comps, mmScale, compSeq, compKind, compSize, compSide, compRot, icPat, icPins, sotPat, icRot, icPin0, compVal, sideCol:SIDECOL, sideOp, xrayOp, showSide, showNets, showComps, notes, showDraw, drawStyle, warpModel, imgDir, projName};
 }
-function save(quiet){ if(!booted)return; clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{ try{ localStorage.setItem(KEY,JSON.stringify(snapshot()));
+function save(quiet){ if(!booted)return; clearTimeout(saveTimer); saveTimer=setTimeout(()=>saveNow(quiet),400); }
+function saveNow(quiet){ /* the debounced part: browser copy, then an undo step and the working folder */
+  clearTimeout(saveTimer); saveTimer=null; if(!booted) return;
+  try{ const s=snapshot(); localStorage.setItem(KEY,JSON.stringify(s));
     if(!quiet&&Date.now()>statusHold) $('saveStatus').innerHTML=L('Сохранено · ','Saved · ')+new Date().toLocaleTimeString(LOC);
-  }catch(err){ $('saveStatus').innerHTML='<span class="bad">'+L('Не сохранено: ','Not saved: ')+err.message+'</span>'; } },400);
+    histNote(s); dirSave();
+  }catch(err){ $('saveStatus').innerHTML='<span class="bad">'+L('Не сохранено: ','Not saved: ')+err.message+'</span>'; }
 }
 function restore(s){
   if(!s||!Array.isArray(s.layers))return false;
   layers.forEach(l=>{stopCam(l);l.clip.remove();l.fx.node.remove()}); layers=[];
-  s.layers.forEach((d,i)=>{ const l=mkLayer(i,{
+  s.layers.forEach((d,i)=>layers.push(mkLayer(i,layerInit(d,i,s))));
+  restoreState(s);
+  return true;
+}
+function layerInit(d,i,s){ /* saved layer -> mkLayer options */
+  return {
     id:d.id, name:d.name||L('Слой ','Layer ')+(i+1), color:d.color||LAYPAL[i%LAYPAL.length],
     side:d.side||'any',
     src:d.src||'', stored:!!d.stored, x:d.x||0,y:d.y||0,rot:d.rot||0,scale:d.scale||1,sx:+d.sx||1,sy:+d.sy||1,
@@ -25,9 +33,10 @@ function restore(s){
     tc:d.tc||LAYPAL[i%LAYPAL.length], tn:typeof d.tn==='number'?d.tn:0,
     tm:d.tm||s.tintMode||'color',
     blend:d.blend||'normal', pairs:Array.isArray(d.pairs)?d.pairs:[],
-    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{}), crop:d.crop||null, main:!!d.main, parent:d.parent||null, fe:+d.fe||0,
-    ...(d.kind==='video'?{kind:'video',camId:d.camId||'',side:'any',vmode:d.vmode==='window'?'window':'overlay'}:{})});
-    layers.push(l); });
+    kOn:!!d.kOn, kc:d.kc||'#ffffff', kt:typeof d.kt==='number'?d.kt:.15, cor:Object.assign({...COR0},d.cor||{}), crop:d.crop||null, main:!!d.main, parent:d.parent||null, fe:+d.fe||0, file:d.file||'',
+    ...(d.kind==='video'?{kind:'video',camId:d.camId||'',side:'any',vmode:d.vmode==='window'?'window':'overlay'}:{})};
+}
+function restoreState(s){ /* everything but building the layers */
   restack();
   sel=byId(s.sel)?s.sel:layers[layers.length-1].id;
   refId=byId(s.refId)&&s.refId!==sel?s.refId:(layers.find(l=>l.id!==sel)||layers[0]).id;
@@ -54,18 +63,17 @@ function restore(s){
   if(typeof s.projName==='string'&&s.projName) projName=s.projName;
   /* old saves kept only the bare file name for files picked via dialog */
   layers.forEach(l=>{ if(l.stored && l.src && !/[\/\\]/.test(l.src)) l.src=dirJoin(imgDir,l.src); });
-  return true;
 }
 /* browser copy of a layer image: original blob in IndexedDB; older saves kept a webp in localStorage */
-function setBlobSrc(l,b){ if(l.url) URL.revokeObjectURL(l.url); l.url=URL.createObjectURL(b); l.el.src=l.url; }
-function loadImages(){
-  layers.forEach(l=>{ l.ok=false; l.blob=null;
-    if(l.kind==='video'){ startCam(l,true); return; }
-    const fromPath=()=>{ const d=l.stored? localStorage.getItem(IMGKEY(l.id)) : null;
-      if(d) l.el.src=d; else if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); };
-    if(!l.stored){ fromPath(); return; }
-    idb.get(l.id).then(b=>{ if(b){ l.blob=b; setBlobSrc(l,b); } else fromPath(); }).catch(fromPath);
-  });
+function setBlobSrc(l,b){ if(l.url) URL.revokeObjectURL(l.url); l.url=URL.createObjectURL(b); l.el.src=l.url;
+  blobMem.set(blobKey(l),b); }
+function loadImages(){ layers.forEach(loadImage); }
+function loadImage(l){ l.ok=false; l.blob=null;
+  if(l.kind==='video'){ startCam(l,true); return; }
+  const fromPath=()=>{ const d=l.stored? localStorage.getItem(IMGKEY(l.id)) : null;
+    if(d) l.el.src=d; else if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); };
+  if(!l.stored){ fromPath(); return; }
+  idb.get(l.id).then(b=>{ if(b){ l.blob=b; setBlobSrc(l,b); } else fromPath(); }).catch(fromPath);
 }
 function checkMissing(){
   const bad=layers.filter(l=>!l.ok&&(l.src||l.stored)), box=$('miss');
@@ -117,12 +125,14 @@ function storeFileLS(l,file){ /* fallback without IndexedDB: compressed webp in 
 
 /* ---------- IndexedDB: original layer images ---------- */
 const idb=(()=>{ let db=null;
-  const open=()=>db||(db=new Promise((res,rej)=>{ const r=indexedDB.open('pcbreverse',1);
-    r.onupgradeneeded=()=>r.result.createObjectStore('img'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }));
-  const run=(mode,fn)=>open().then(d=>new Promise((res,rej)=>{ const t=d.transaction('img',mode);
-    const q=fn(t.objectStore('img')); t.oncomplete=()=>res(q&&q.result); t.onerror=()=>rej(t.error); }));
-  return { get:k=>run('readonly',s=>s.get(k)), put:(k,v)=>run('readwrite',s=>s.put(v,k)),
-           del:k=>run('readwrite',s=>s.delete(k)), clear:()=>run('readwrite',s=>s.clear()) };
+  const open=()=>db||(db=new Promise((res,rej)=>{ const r=indexedDB.open('pcbreverse',2);   /* v2: + meta */
+    r.onupgradeneeded=()=>['img','meta'].forEach(n=>{ if(!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n); });
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }));
+  const run=(st,mode,fn)=>open().then(d=>new Promise((res,rej)=>{ const t=d.transaction(st,mode);
+    const q=fn(t.objectStore(st)); t.oncomplete=()=>res(q&&q.result); t.onerror=()=>rej(t.error); }));
+  const store=st=>({ get:k=>run(st,'readonly',s=>s.get(k)), put:(k,v)=>run(st,'readwrite',s=>s.put(v,k)),
+           del:k=>run(st,'readwrite',s=>s.delete(k)), clear:()=>run(st,'readwrite',s=>s.clear()) });
+  return {...store('img'), meta:store('meta')};
 })();
 
 /* ---------- project file *.pcbr = zip (store, no compression) ---------- */
@@ -221,6 +231,20 @@ async function saveProject(skipMissing){
     ' · '+(zip.size/1048576).toFixed(1)+L(' МБ',' MB');
   statusHold=Date.now()+5000; save(true);
 }
+async function openProject(s,getBlob){ /* project.json + its images (from a .pcbr or the working folder) -> state;
+                                         images go to IndexedDB as the browser copy. Returns the number of images. */
+  layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
+  await idb.clear().catch(()=>{});
+  if(!restore(s)) throw new Error(L('нет слоёв','no layers'));
+  let n=0;
+  for(const d of s.layers){ const l=byId(d.id); if(!l) continue; l.ok=false; l.blob=null;
+    const b=await getBlob(d);
+    if(b){ l.blob=b; l.stored=true; setBlobSrc(l,b); idb.put(l.id,b).catch(()=>{}); n++; }
+    else if(l.kind==='video') startCam(l,true);
+    else { l.stored=false; if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); }
+  }
+  return n;
+}
 function pickMissing(files){
   const left=[...missLayers];
   [...files].forEach(f=>{ const i=left.findIndex(l=>baseName(l.src).toLowerCase()===f.name.toLowerCase());
@@ -233,6 +257,7 @@ function adoptFile(l,f){ /* keep the original next to the layer; path stays as i
 function afterLoad(msg){
   renderCards(); renderFiles(); renderNets(); renderComps(); applyAll(); applyView(); sync(); checkMissing();
   $('missRow').hidden=true; $('saveStatus').innerHTML='<span class="good">'+msg+'</span>'; statusHold=Date.now()+5000; save(true);
+  histReset();
 }
 async function loadProject(f){
   const st=$('saveStatus');
@@ -244,18 +269,11 @@ async function loadProject(f){
     const ent=await unzip(await f.arrayBuffer());
     if(!ent['project.json']) throw new Error(L('в архиве нет project.json','no project.json in the archive'));
     const s=JSON.parse(new TextDecoder().decode(ent['project.json']));
-    layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
-    await idb.clear().catch(()=>{});
-    if(!restore(s)) throw new Error(L('нет слоёв','no layers'));
+    const off=workDir?L(' · рабочая папка отключена',' · working folder disconnected'):'';
+    if(workDir) unbindDir();   /* a .pcbr must not overwrite the folder's project */
+    const n=await openProject(s,d=>d.file&&ent[d.file]?new Blob([ent[d.file]],{type:MIME[extOf(d.file)]||''}):null);
     projName=f.name.replace(/\.(pcbr|zip)$/i,'');
-    let n=0;
-    for(const d of s.layers){ const l=byId(d.id); if(!l) continue; l.ok=false; l.blob=null;
-      const data=d.file&&ent[d.file];
-      if(data){ const b=new Blob([data],{type:MIME[extOf(d.file)]||''});
-        l.blob=b; l.stored=true; setBlobSrc(l,b); idb.put(l.id,b).catch(()=>{}); n++; }
-      else if(l.kind==='video') startCam(l,true);
-      else { l.stored=false; if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); }
-    }
-    afterLoad(L('Проект загружен: ','Project loaded: ')+f.name+L(' · картинок ',' · images ')+n); return true;
+    layers.forEach(l=>l.file='');   /* archive names are not files of any folder */
+    afterLoad(L('Проект загружен: ','Project loaded: ')+f.name+L(' · картинок ',' · images ')+n+off); return true;
   }catch(err){ st.innerHTML='<span class="bad">'+L('Ошибка загрузки: ','Load error: ')+err.message+'</span>'; }
 }
