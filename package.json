@@ -4,7 +4,9 @@
   "description": "PCB reverse-engineering overlay — dev tooling only (the app itself needs no build)",
   "scripts": {
     "check": "node tests/check.js",
-    "smoke": "node tests/smoke.js"
+    "smoke": "node tests/smoke.js",
+    "smoke:show": "node tests/smoke.js --headed",
+    "smoke:trace": "node tests/smoke.js --trace"
   },
   "devDependencies": {
     "playwright": "^1.63.0"

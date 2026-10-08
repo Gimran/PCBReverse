@@ -1,6 +1,8 @@
 /*
  * Smoke test for index.html (PCB reverse overlay).
- * Run:   npm i -D playwright  (once)   then   node tests/smoke.js [project.pcbr | state.json]
+ * Run:   npm i -D playwright  (once)   then   node tests/smoke.js [project.pcbr | state.json] [--headed] [--slow=ms] [--trace]
+ *   --headed  visible browser window, actions slowed down (--slow=ms, default 300) — to watch the test
+ *   --trace   record tests/out/smoke-trace.zip; open it with  npx playwright show-trace tests/out/smoke-trace.zip
  * Loads the page from disk, opens the reference project (default tests/test_project.pcbr)
  * through «Загрузить проект», and checks the invariants that broke during development.
  */
@@ -8,12 +10,17 @@ const path = require('path'), fs = require('fs');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
 const URL = 'file:///' + path.join(ROOT, 'index.html').replace(/\\/g, '/');
-const STATE = process.argv[2] ? path.resolve(process.argv[2]) : path.join(__dirname, 'test_project.pcbr');
+const ARGS = process.argv.slice(2), FILE = ARGS.find(a => !a.startsWith('--'));
+const HEADED = ARGS.includes('--headed'), TRACE = ARGS.includes('--trace');
+const SLOW = +((ARGS.find(a => a.startsWith('--slow=')) || '').split('=')[1] || 300);
+const STATE = FILE ? path.resolve(FILE) : path.join(__dirname, 'test_project.pcbr');
 const PCBR = /\.pcbr$/i.test(STATE);
 
 (async () => {
-  const b = await chromium.launch();
-  const p = await b.newPage({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
+  const b = await chromium.launch(HEADED ? { headless: false, slowMo: SLOW } : {});
+  const ctx = await b.newContext({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
+  if (TRACE) await ctx.tracing.start({ screenshots: true, snapshots: true });
+  const p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   let fail = 0; const ok = (c, m) => { console.log((c ? 'OK   ' : 'FAIL ') + m); if (!c) fail++; };
 
@@ -87,6 +94,9 @@ const PCBR = /\.pcbr$/i.test(STATE);
   }
 
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
+  if (TRACE) { const out = path.join(__dirname, 'out', 'smoke-trace.zip'); fs.mkdirSync(path.dirname(out), { recursive: true });
+    await ctx.tracing.stop({ path: out }); console.log('trace: npx playwright show-trace ' + path.relative(ROOT, out)); }
+  if (HEADED) await p.waitForTimeout(1500);
   await b.close();
   process.exit(fail ? 1 : 0);
 })();
