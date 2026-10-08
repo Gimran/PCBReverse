@@ -292,7 +292,8 @@ function renderPropsComp(){
       const pn=document.createElement('input'); pn.type='text'; pn.value=pd.name||''; pn.placeholder=L('название','name'); pn.spellcheck=false;
       pn.title=L('название вывода (VCC, 1A, OE…)','pin name (VCC, 1A, OE…)');
       pn.oninput=()=>{ const v=pn.value.trim(); if(v) pd.name=v; else delete pd.name; drawMarks(); save(); };
-      pn.onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape') pn.blur(); };
+      pn.onkeydown=e=>{ if(e.key==='Escape') pn.blur();   /* Enter — name of the next pin; Tab — this pin's NET (DOM order) */
+        if(e.key==='Enter'){ e.preventDefault(); const nx=pl.querySelectorAll('input')[i+1]; if(nx){ nx.focus(); nx.select(); } else pn.blur(); } };
       const s2=document.createElement('select'); s2.className='slim';
       const o0=document.createElement('option'); o0.value=''; o0.textContent='—'; s2.appendChild(o0);
       nets.forEach(nt=>{const o=document.createElement('option');o.value=nt.id;o.textContent=nt.name;s2.appendChild(o)});
