@@ -267,6 +267,11 @@ function renderPropsComp(){
     val.placeholder=isSOT(c)?'BC847':'SN74AC14';
     const pi=document.createElement('span'); pi.className='val'; pi.style.textAlign='left'; pi.style.flex='1';
     pi.textContent=c.size+' · '+ICPATNAME(c.pat); mkRow(L('корпус','package'),pi);
+    if(canPartEdit(c)){ const eb=document.createElement('button'); eb.className='mini wide'+(clickMode==='pedit'&&pe&&pe.id===c.id?' on':'');
+      eb.textContent=L('Правка расположения','Edit place'); eb.onclick=startPartEdit;
+      eb.title=L('рамка вокруг выводов, как при установке: сдвиг, масштаб, растяжение по оси, поворот (клик в рамке — масштаб ⇄ вращение), ⊕ — центр; Esc — выход',
+                 'frame around the pins, as when placing: move, scale, stretch along an axis, rotate (click in the frame — scale ⇄ rotate), ⊕ — pivot; Esc — exit');
+      box.appendChild(eb); }
     if(c.pat==='l1'){ const sp=document.createElement('input'); sp.type='text'; sp.className='num'; sp.value=pinNo(c,0);
       sp.title=L('номер первого вывода','first pin number');
       sp.onchange=()=>{ const v=parseInt(sp.value,10); c.pin0=Number.isFinite(v)?v:1; renderProps(); drawMarks(); save(); };

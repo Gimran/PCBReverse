@@ -18,6 +18,9 @@ vp.addEventListener('pointerdown',e=>{
   if(e.button!==0)return;
   if(mergeFrom){ drag={t:'click',x:e.clientX,y:e.clientY,moved:false}; vp.setPointerCapture(e.pointerId); return; }
   if(e.target===handle){drag={t:'swipe'};vp.setPointerCapture(e.pointerId);return;}
+  if(clickMode==='pedit'){ const hb=hitPartBox(e);   /* part placement edit: frame handles, outside — leave the mode */
+    if(!hb){ endPartEdit(); return; }
+    const d=partDragStart(e,hb); if(d){ drag=d; vp.setPointerCapture(e.pointerId); } return; }
   if(clickMode==='draw'){
     const m=worldFromEvent(e), h=hitNote(e);
     if(h){ selNote=h.n.id; renderProp();
@@ -78,6 +81,7 @@ vp.addEventListener('pointerdown',e=>{
 });
 vp.addEventListener('dblclick',e=>{
   if(clickMode==='move'&&hitLayerBox(e)==='piv'){ const s=sel_(); s.piv=null; drawMarks(); }
+  if(clickMode==='pedit'&&pe&&hitPartBox(e)==='piv'){ pe.piv=null; drawMarks(); }
 });
 vp.addEventListener('pointermove',e=>{
   if(!drag){
@@ -87,6 +91,11 @@ vp.addEventListener('pointermove',e=>{
         c=Math.abs(v.x)>=Math.abs(v.y)?'ew-resize':'ns-resize'; }
       vp.style.cursor=c; }
     if(clickMode==='comp'&&placing&&frameKind()){ mouseAt={clientX:e.clientX,clientY:e.clientY}; drawMarks(); }
+    if(clickMode==='pedit'){ const h=hitPartBox(e), c=peComp(); let cur='';
+      if(h==='piv'||h==='in') cur='move'; else if(h==='scale') cur='nwse-resize'; else if(h==='rot') cur='alias';
+      else if((h==='su'||h==='sv')&&c){ const f=partFrame(c), a=h==='su'?f.u:f.v, p0=screenOf(f.o), p1=screenOf({x:f.o.x+a.x,y:f.o.y+a.y});
+        cur=Math.abs(p1.x-p0.x)>=Math.abs(p1.y-p0.y)?'ew-resize':'ns-resize'; }
+      vp.style.cursor=cur; }
     if(clickMode==='crop'){ const h=sel_()&&hitCropBox(e);
       vp.style.cursor=!h?'':h.ex==='in'?'move':(h.ex&&h.ey)?'nwse-resize':h.ex?'ew-resize':'ns-resize'; }
     return; }
@@ -95,6 +104,7 @@ vp.addEventListener('pointermove',e=>{
   const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
   if(Math.hypot(dx,dy)>3)drag.moved=true;
   if(drag.t==='pan'){view.x=drag.ox+dx; view.y=drag.oy+dy; applyView(); return;}
+  if(PDRAG.has(drag.t)){ if(drag.moved) partDragMove(drag,e); return; }
   if(drag.t==='layer'){const s=sel_(); if(!s||s.H)return;
     const d=screenDelta(dx,dy);
     s.x=drag.ox+d.x; s.y=drag.oy+d.y; applyLayer(s); sync(); return;}
@@ -150,6 +160,7 @@ vp.addEventListener('pointerup',e=>{
   if(e.button===1){ drag=null; vp.classList.remove('grabbing'); return; }
   if(e.button!==0)return;
   const d=drag; drag=null; vp.classList.remove('grabbing');
+  if(d&&PDRAG.has(d.t)){ partDragEnd(d); return; }
   if(d&&d.t==='layer'&&!d.moved&&d.inside){ xfMode=xfMode==='scale'?'rot':'scale'; drawMarks(); sync(); return; }
   if(d&&d.t==='comp'&&d.moved){ const c=comps.find(o=>o.id===d.id);
     if(c&&autoPins(c)){ renderProps(); drawMarks(); save(); } return; }
@@ -479,7 +490,8 @@ addEventListener('keydown',e=>{
     case 'm':case 'M':case 'ь':case 'Ь':if(!$('moveBtn').disabled)$('moveBtn').click();return;
     case 'f':case 'F':case 'а':case 'А':flipBoard();return;
     case ' ':case 'Spacebar':e.preventDefault();rotateComp(e.shiftKey?-45:45);return;
-    case 'Escape': if(mergeFrom){ hlNet=mergeFrom; mergeFrom=null; renderNets(); drawMarks(); sync(); return; }
+    case 'Escape': if(clickMode==='pedit'){ endPartEdit(); return; }
+      if(mergeFrom){ hlNet=mergeFrom; mergeFrom=null; renderNets(); drawMarks(); sync(); return; }
       if(placing){ placing=false; syncComps(); drawMarks(); return; }   /* first Esc ends placing, stays in K */
       clickMode='none';pending=null;calib=null;hlNet=null;renderNets();sync();drawMarks();return;
     case 'z':case 'Z':case 'я':case 'Я':if(!$('undoPt').disabled)$('undoPt').click();return;

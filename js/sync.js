@@ -7,6 +7,7 @@ function autoCompSide(){
   compSideKey=k; compSide=(l&&(l.side==='top'||l.side==='bot'))?l.side:boardSide;
 }
 function sync(){
+  if(clickMode==='pedit'&&(!peComp()||selComp!==pe.id)){ pe=null; clickMode='none'; }   /* the edited part is gone / another selected */
   if(booted){ const k=[selComp,selPoint,selNote,hlNet,clickMode,nets.length,comps.length,notes.length].join('|');
     if(k!==propKey) renderProp(); }   /* PROP follows selection / mode changes */
   autoCompSide();
@@ -61,6 +62,8 @@ function sync(){
   else if(netting&&an){cue.hidden=false;cue.textContent=an.name+L(': клик — точка · Alt+клик — переходное · Ctrl+клик — новый NET (via)',': click — point · Alt+click — via · Ctrl+click — new NET (via)');}
   else if(clickMode==='move'){cue.hidden=false;cue.textContent=L(`деформация: ${xfMode==='scale'?'масштаб (углы — пропорц., стороны — по оси)':'вращение'} · клик по слою — сменить · ⊕ — центр (двойной клик — в центр) · Shift — шаг 15°`,
     `transform: ${xfMode==='scale'?'scale (corners — proportional, sides — one axis)':'rotate'} · click the layer — switch · ⊕ — pivot (double-click — back to centre) · Shift — 15° steps`);}
+  else if(clickMode==='pedit'&&peComp()){cue.hidden=false;cue.textContent=L(`расположение ${peComp().des}: ${peMode==='scale'?'масштаб (углы — пропорц., стороны — по оси)':'вращение'} · клик в рамке — сменить · внутри — сдвиг · ⊕ — центр (двойной клик — в центр) · Shift — шаг 15° · Esc / клик мимо — выход`,
+    `place ${peComp().des}: ${peMode==='scale'?'scale (corners — proportional, sides — one axis)':'rotate'} · click in the frame — switch · inside — move · ⊕ — pivot (double-click — back to centre) · Shift — 15° steps · Esc / click outside — exit`);}
   else if(clickMode==='crop'){cue.hidden=false;cue.textContent=L('кроп «'+(s?s.name:'—')+'»: тяните стороны и углы, внутри — сдвиг рамки','crop “'+(s?s.name:'—')+'”: drag sides and corners, inside — move the frame');}
   else cue.hidden=true;
   vp.classList.toggle('picking',clickMode!=='none');

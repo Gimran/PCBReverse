@@ -171,4 +171,5 @@ function drawMarks(){
   drawNotes();
   if(clickMode==='move') drawLayerBox();
   if(clickMode==='crop') drawCropBox();
+  if(clickMode==='pedit') drawPartBox();
 }
