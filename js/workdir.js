@@ -1,7 +1,8 @@
 /* ---------- working folder: the project lives on disk as project.json + images/ (File System Access, Chrome / Edge) ----------
    Every autosave also writes project.json (debounced); a layer image is written once into images/ (l.file).
-   The folder handle is kept in IndexedDB meta/workDir; Chrome asks for access once per browser session («Подключить»).
-   DIRTY flag: something saved to the browser is not in the folder yet (no access, or a write still pending). */
+   The folder handle is kept in IndexedDB meta 'dir:<scope>'; the tab's scope (project.js) says which folder it works in,
+   so two tabs can hold two folders. Chrome asks for access once per browser session («Подключить»).
+   DIRTY flag (per scope): something saved to the browser is not in the folder yet (no access, or a write pending). */
 let workDir=null, workDirOk=false, dirTimer=null, dirQ=Promise.resolve(), dirErr='', dirAt=0, saveSeq=0;
 const DIRTY='pcbr-dirdirty';
 const hasFSA=()=>!!window.showDirectoryPicker;
@@ -13,7 +14,8 @@ async function fsWrite(dir,path,data){ const w=await (await fsFile(dir,path,true
 function imgFileName(l,b){
   const ext=extOf(baseName(l.src))||Object.keys(MIME).find(k=>MIME[k]===b.type)||'png';
   return 'images/'+l.id+'_'+(baseName(l.src).replace(/\.[^.]*$/,'')||'image')+'.'+ext; }
-function setDirty(on){ try{ on?localStorage.setItem(DIRTY,'1'):localStorage.removeItem(DIRTY); }catch(err){} }
+const dirtyKey=()=>DIRTY+':'+scope;
+function setDirty(on){ try{ on?localStorage.setItem(dirtyKey(),'1'):localStorage.removeItem(dirtyKey()); }catch(err){} }
 function dirSave(){ /* from saveNow */
   if(!workDir) return;
   saveSeq++; setDirty(true);
@@ -31,10 +33,24 @@ async function writeDir(){
   await fsWrite(d,'project.json',JSON.stringify(snapshot(),null,1));
   dirErr=''; dirAt=Date.now(); if(seq===saveSeq) setDirty(false); syncDir();
 }
-async function bindDir(h){ workDir=h; workDirOk=true; projName=h.name;
-  await idb.meta.put('workDir',h).catch(()=>{}); }
+async function dirScope(h){ /* the same folder picked again keeps its id */
+  const ks=await idb.meta.keys().catch(()=>[]);
+  for(const k of ks){ if(!String(k).startsWith('dir:')) continue;
+    const o=await idb.meta.get(k).catch(()=>null); if(o&&await o.isSameEntry(h).catch(()=>false)) return String(k).slice(4); }
+  return 'd'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+}
+function moveScope(s){ /* the project in memory now belongs to scope s: browser copy and cached images go there */
+  setScope(s); saveNow(true);
+  layers.forEach(l=>{ if(l.blob&&l.kind!=='video') idb.put(ik(l.id),l.blob).catch(()=>{}); });
+}
+async function bindDir(h,keep){ /* keep: the current project goes into the folder (else the folder's project is loaded) */
+  const id=await dirScope(h);
+  await idb.meta.put('dir:'+id,h).catch(()=>{});
+  workDir=h; workDirOk=true; projName=h.name;
+  if(keep) moveScope(id); else setScope(id);
+}
 function unbindDir(){ workDir=null; workDirOk=false; clearTimeout(dirTimer); setDirty(false);
-  idb.meta.del('workDir').catch(()=>{}); syncDir(); }
+  moveScope(''); syncDir(); }
 async function pickWorkDir(){
   if(!hasFSA()){ $('saveStatus').innerHTML='<span class="bad">'+L('Этот браузер не работает с папками — нужен Chrome или Edge.',
     'This browser cannot use folders — Chrome or Edge is needed.')+'</span>'; return; }
@@ -42,8 +58,9 @@ async function pickWorkDir(){
   if(await fsRead(h,'project.json')){
     if(!confirm(L(`В папке «${h.name}» уже есть проект. Открыть его?\n\nТекущий проект в браузере будет заменён.`,
                   `Folder “${h.name}” already holds a project. Open it?\n\nThe current project in the browser will be replaced.`))) return;
-    await bindDir(h); await loadFromDir(h); return; }
-  await bindDir(h); layers.forEach(l=>{ l.file=''; l.fileBlob=null; });   /* new folder: all images go there */
+    await bindDir(h,false); await loadFromDir(h); return; }
+  layers.forEach(l=>{ l.file=''; l.fileBlob=null; });   /* new folder: all images go there */
+  await bindDir(h,true);
   $('saveStatus').textContent=L('Запись в папку…','Writing to the folder…'); syncDir();
   await writeDirQ();
   if(!dirErr){ $('saveStatus').innerHTML='<span class="good">'+L('Проект записан в папку «','Project written to folder “')+h.name+
@@ -66,17 +83,27 @@ async function connectDir(auto){ /* auto: access is still granted (same browser 
   if(!auto){ let p='denied'; try{ p=await h.requestPermission({mode:'readwrite'}); }catch(err){}
     if(p!=='granted'){ syncDir(); return; } }
   workDirOk=true; projName=h.name;
-  const f=await fsRead(h,'project.json'), dirty=localStorage.getItem(DIRTY)==='1';
+  const f=await fsRead(h,'project.json'), dirty=localStorage.getItem(dirtyKey())==='1';
   if(!f){ await writeDirQ(); return; }   /* the folder lost its project: write the browser copy */
   if(dirty&&(auto||confirm(L(`В браузере есть изменения, которых нет в папке «${h.name}».\n\nOK — записать их в папку.\nОтмена — открыть проект из папки (эти изменения пропадут).`,
       `The browser has changes that are not in folder “${h.name}”.\n\nOK — write them to the folder.\nCancel — open the project from the folder (these changes are lost).`)))){
     await writeDirQ(); return; }
-  if(!dirty&&keyOf(JSON.parse(await f.text()))===keyOf(snapshot())){ syncDir(); return; }   /* same project — nothing to do */
+  if(!dirty&&keyOf(JSON.parse(await f.text()))===keyOf(snapshot())){   /* same project: only images missing in the browser */
+    for(const l of layers){ if(l.blob||!l.file||l.kind==='video') continue; const b=await fsRead(h,l.file);
+      if(b){ l.blob=b; l.stored=true; l.fileBlob=b; setBlobSrc(l,b); idb.put(ik(l.id),b).catch(()=>{}); } }
+    syncDir(); return; }
   await loadFromDir(h);   /* the folder is the truth (it may be synced from another computer) */
 }
 async function initWorkDir(){ /* boot */
   syncDir(); if(!hasFSA()) return;
-  const h=await idb.meta.get('workDir').catch(()=>null); if(!h) return;
+  { const old=await idb.meta.get('workDir').catch(()=>null);   /* first version kept one folder for all tabs */
+    if(old){ await idb.meta.del('workDir').catch(()=>{}); if(!scope){ const id=await dirScope(old);
+      await idb.meta.put('dir:'+id,old).catch(()=>{});
+      for(const l of layers){ const b=await idb.get(l.id).catch(()=>null); if(b) await idb.put(id+'/'+l.id,b).catch(()=>{}); }
+      moveScope(id); } } }
+  if(!scope) return;
+  const h=await idb.meta.get('dir:'+scope).catch(()=>null);
+  if(!h){ setScope(''); return; }
   workDir=h; let p='prompt'; try{ p=await h.queryPermission({mode:'readwrite'}); }catch(err){}
   if(p==='granted') await connectDir(true); else syncDir();
 }

@@ -43,7 +43,7 @@ function applyDoc(d){
   } else {   /* a layer was added / removed / got another image: rebuild, images from memory */
     restore(s);
     layers.forEach(l=>{ const b=blobMem.get(blobKey(l));
-      if(b&&l.kind!=='video'){ l.ok=false; l.blob=b; setBlobSrc(l,b); if(l.stored) idb.put(l.id,b).catch(()=>{}); }
+      if(b&&l.kind!=='video'){ l.ok=false; l.blob=b; setBlobSrc(l,b); if(l.stored) idb.put(ik(l.id),b).catch(()=>{}); }
       else loadImage(l); });
   }
   selComp=comps.some(c=>c.id===keep.selComp)?keep.selComp:null;

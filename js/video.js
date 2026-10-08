@@ -62,7 +62,7 @@ function removeLayer(l){
   layers=layers.filter(x=>x!==l);
   points=points.filter(p=>p.layer!==l.id);
   layers.forEach(o=>o.pairs=o.pairs.filter(pr=>pr.rl!==l.id));
-  localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{});
+  localStorage.removeItem(IMGKEY(l.id)); idb.del(ik(l.id)).catch(()=>{});
   if(l.url) URL.revokeObjectURL(l.url);
   l.clip.remove(); l.fx.node.remove();
   renderNets(); layersChanged(); drawMarks();

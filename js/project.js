@@ -1,5 +1,13 @@
 /* ---------- persistence ---------- */
 let saveTimer=null, statusHold=0; /* project messages stay visible a few seconds */
+/* storage scope: all file:// pages share one localStorage / IndexedDB. '' — the browser-only project; a working folder
+   has its own id, so the browser copy (state key, cached images, dirty flag) of each folder is separate. The scope is
+   pinned to the tab (sessionStorage, survives a reload); a new tab starts with the last used one. */
+const SCOPEKEY='pcbr-scope', LASTSCOPE='pcbr-lastscope';
+let scope=''; try{ scope=sessionStorage.getItem(SCOPEKEY)??localStorage.getItem(LASTSCOPE)??''; }catch(err){}
+const stKey=()=>scope?KEY+':'+scope:KEY;      /* localStorage key of the browser copy */
+const ik=id=>scope?scope+'/'+id:id;           /* IndexedDB key of a layer image */
+function setScope(s){ scope=s||''; try{ sessionStorage.setItem(SCOPEKEY,scope); localStorage.setItem(LASTSCOPE,scope); }catch(err){} }
 function snapshot(){
   return {v:4, count:layers.length, sel, refId, viewMode, swipe, view, boardSide, xray,
     inverted, grayView, grid, labels, blinkOn, tintMode,
@@ -12,7 +20,7 @@ function snapshot(){
 function save(quiet){ if(!booted)return; clearTimeout(saveTimer); saveTimer=setTimeout(()=>saveNow(quiet),400); }
 function saveNow(quiet){ /* the debounced part: browser copy, then an undo step and the working folder */
   clearTimeout(saveTimer); saveTimer=null; if(!booted) return;
-  try{ const s=snapshot(); localStorage.setItem(KEY,JSON.stringify(s));
+  try{ const s=snapshot(); localStorage.setItem(stKey(),JSON.stringify(s));
     if(!quiet&&Date.now()>statusHold) $('saveStatus').innerHTML=L('Сохранено · ','Saved · ')+new Date().toLocaleTimeString(LOC);
     histNote(s); dirSave();
   }catch(err){ $('saveStatus').innerHTML='<span class="bad">'+L('Не сохранено: ','Not saved: ')+err.message+'</span>'; }
@@ -73,7 +81,7 @@ function loadImage(l){ l.ok=false; l.blob=null;
   const fromPath=()=>{ const d=l.stored? localStorage.getItem(IMGKEY(l.id)) : null;
     if(d) l.el.src=d; else if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); };
   if(!l.stored){ fromPath(); return; }
-  idb.get(l.id).then(b=>{ if(b){ l.blob=b; setBlobSrc(l,b); } else fromPath(); }).catch(fromPath);
+  idb.get(ik(l.id)).then(b=>{ if(b){ l.blob=b; setBlobSrc(l,b); } else fromPath(); }).catch(fromPath);
 }
 function checkMissing(){
   const bad=layers.filter(l=>!l.ok&&(l.src||l.stored)), box=$('miss');
@@ -89,13 +97,13 @@ function checkMissing(){
     : L('Изображения не заданы. СЛОИ → «+ Добавить слой».','No images set. LAYERS → “+ Add layer”.');
 }
 function setPath(l,v,reread){ v=(v||'').trim().replace(/\\/g,'/');
-  l.src=v; l.stored=false; l.blob=null; localStorage.removeItem(IMGKEY(l.id)); idb.del(l.id).catch(()=>{}); l.ok=false;
+  l.src=v; l.stored=false; l.blob=null; localStorage.removeItem(IMGKEY(l.id)); idb.del(ik(l.id)).catch(()=>{}); l.ok=false;
   if(v) l.el.src = reread ? v+(v.includes('?')?'&':'?')+'r='+Date.now() : v;
   else l.el.removeAttribute('src');
   save(); renderFiles(); sync(); }
 function storeFile(id,file){
   const l=byId(id); if(!l)return;
-  idb.put(l.id,file).then(()=>{
+  idb.put(ik(l.id),file).then(()=>{
     l.blob=file; l.stored=true; l.src=dirJoin(imgDir,file.name); l.ok=false; setBlobSrc(l,file);
     localStorage.removeItem(IMGKEY(l.id)); save(); renderFiles(); sync();
   }).catch(()=>storeFileLS(l,file));
@@ -132,7 +140,9 @@ const idb=(()=>{ let db=null;
     const q=fn(t.objectStore(st)); t.oncomplete=()=>res(q&&q.result); t.onerror=()=>rej(t.error); }));
   const store=st=>({ get:k=>run(st,'readonly',s=>s.get(k)), put:(k,v)=>run(st,'readwrite',s=>s.put(v,k)),
            del:k=>run(st,'readwrite',s=>s.delete(k)), clear:()=>run(st,'readwrite',s=>s.clear()) });
-  return {...store('img'), meta:store('meta')};
+  const clearScope=()=>run('img','readwrite',s=>{ const q=s.getAllKeys();   /* images of the current scope only */
+    q.onsuccess=()=>q.result.forEach(k=>{ const t=String(k); if(scope?t.startsWith(scope+'/'):!t.includes('/')) s.delete(k); }); return q; });
+  return {...store('img'), clearScope, meta:{...store('meta'), keys:()=>run('meta','readonly',s=>s.getAllKeys())}};
 })();
 
 /* ---------- project file *.pcbr = zip (store, no compression) ---------- */
@@ -184,7 +194,7 @@ const baseName=p=>(p||'').split(/[\\/]/).pop().split('?')[0];
 const extOf=n=>{ const m=/\.([a-z0-9]+)$/i.exec(n||''); return m?m[1].toLowerCase():''; };
 async function layerBlob(l){ /* original bytes of a layer image, or null if the page can't read them */
   if(l.blob) return l.blob;
-  if(l.stored){ const b=await idb.get(l.id).catch(()=>null); if(b) return b;
+  if(l.stored){ const b=await idb.get(ik(l.id)).catch(()=>null); if(b) return b;
     const d=localStorage.getItem(IMGKEY(l.id)); if(d) return (await fetch(d)).blob(); }
   if(l.src){
     try{ const r=await fetch(l.src); if(r.ok) return await r.blob(); }catch(err){}
@@ -234,12 +244,12 @@ async function saveProject(skipMissing){
 async function openProject(s,getBlob){ /* project.json + its images (from a .pcbr or the working folder) -> state;
                                          images go to IndexedDB as the browser copy. Returns the number of images. */
   layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
-  await idb.clear().catch(()=>{});
+  await idb.clearScope().catch(()=>{});
   if(!restore(s)) throw new Error(L('нет слоёв','no layers'));
   let n=0;
   for(const d of s.layers){ const l=byId(d.id); if(!l) continue; l.ok=false; l.blob=null;
     const b=await getBlob(d);
-    if(b){ l.blob=b; l.stored=true; setBlobSrc(l,b); idb.put(l.id,b).catch(()=>{}); n++; }
+    if(b){ l.blob=b; l.stored=true; setBlobSrc(l,b); idb.put(ik(l.id),b).catch(()=>{}); n++; }
     else if(l.kind==='video') startCam(l,true);
     else { l.stored=false; if(l.src) l.el.src=l.src; else l.el.removeAttribute('src'); }
   }
@@ -253,7 +263,7 @@ function pickMissing(files){
   saveProject(false);
 }
 function adoptFile(l,f){ /* keep the original next to the layer; path stays as is */
-  l.blob=f; l.stored=true; idb.put(l.id,f).catch(()=>{}); }
+  l.blob=f; l.stored=true; idb.put(ik(l.id),f).catch(()=>{}); }
 function afterLoad(msg){
   renderCards(); renderFiles(); renderNets(); renderComps(); applyAll(); applyView(); sync(); checkMissing();
   $('missRow').hidden=true; $('saveStatus').innerHTML='<span class="good">'+msg+'</span>'; statusHold=Date.now()+5000; save(true);

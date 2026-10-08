@@ -449,11 +449,11 @@ $('newProj').onclick=()=>{
     'New project?\n\nThis removes from the browser: layers ('+layers.length+', with images '+n+'), NETs ('+nets.length+
     '), components ('+comps.length+'), warps and calibration.\nAnything not saved to *.pcbr will be lost.'))) return;
   booted=false; clearTimeout(saveTimer);          /* no autosave between clearing and reload */
-  localStorage.removeItem(KEY);
+  setScope(''); localStorage.removeItem(KEY);   /* the new project is the browser-only one */
   layers.forEach(l=>localStorage.removeItem(IMGKEY(l.id)));
   try{ sessionStorage.setItem(NEWKEY,'1'); }catch(err){}
   setDirty(false);   /* a new project is not the working folder's one: forget the folder */
-  Promise.all([idb.clear().catch(()=>{}),idb.meta.del('workDir').catch(()=>{})]).then(()=>location.reload()); };
+  idb.clearScope().catch(()=>{}).then(()=>location.reload()); };
 
 addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;

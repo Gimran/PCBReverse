@@ -1,6 +1,7 @@
 /* ---------- boot ---------- */
 let restored=false;
-try{ const raw=localStorage.getItem(KEY); if(raw) restored=restore(JSON.parse(raw)); }catch(err){}
+setScope(scope);   /* pin the scope to this tab */
+try{ const raw=localStorage.getItem(stKey()); if(raw) restored=restore(JSON.parse(raw)); }catch(err){}
 let fresh=false; try{ fresh=sessionStorage.getItem(NEWKEY)==='1'; sessionStorage.removeItem(NEWKEY); }catch(err){}
 if(!restored){   /* «Новый проект» / first start: empty main layers, pick photos in the cards */
   layers.push(mkLayer(0,{name:'TOP',side:'top',main:true}));
@@ -25,7 +26,7 @@ function loadDemo(){
   $('saveStatus').textContent=L('Загрузка демо-проекта…','Loading the demo project…');
   document.body.appendChild(sc);
 }
-if(!restored&&!fresh&&!/[?&]nodemo\b/.test(location.search)) loadDemo();
+if(!restored&&!fresh&&!scope&&!/[?&]nodemo\b/.test(location.search)) loadDemo();   /* scope: the folder brings the project */
 $('langBtn').textContent=L('EN','RU'); $('langBtn').title=L('Switch to English','Переключить на русский');
 $('langBtn').onclick=()=>{ saveNow(true);   /* save now (marks the working folder dirty), then reload in the other language */
   try{ localStorage.setItem(LANGKEY,L('en','ru')); }catch(err){}
