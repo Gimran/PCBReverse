@@ -125,6 +125,7 @@ function icGeom(c){
 }
 function drawIC(c,col,isSel){
   const {b,P,n,conn,C,U,N,pitch,depth,round,pw,pl,rr,half,dot,sub}=icGeom(c);
+  let body=null;   /* {o, u, v, len, th} on screen — for the value text */
   if(!conn&&Number.isFinite(depth)&&U[0]){   /* body: inner edges of the pad rows */
     const u0=U[0], v0=N[0], S=P.map(q=>dot(sub(q,C),u0)), T=P.map(q=>dot(sub(q,C),v0));
     const s0=Math.min(...S), s1=Math.max(...S), t0=Math.min(...T)+pl/2, t1=Math.max(...T)-pl/2;
@@ -132,18 +133,21 @@ function drawIC(c,col,isSel){
     const at=(x,y)=>(C.x+u0.x*x+v0.x*y)+','+(C.y+u0.y*x+v0.y*y);
     marks.appendChild(svg('polygon',{points:[at(a0,t0),at(a1,t0),at(a1,t1),at(a0,t1)].join(' '),fill:'rgba(10,14,12,.16)',
       stroke:isSel?'#fff':col,'stroke-width':isSel?1.8:1.2,...(isSel?{'stroke-dasharray':'5 3'}:{})}));
+    body={o:{x:C.x+u0.x*(a0+a1)/2+v0.x*(t0+t1)/2,y:C.y+u0.y*(a0+a1)/2+v0.y*(t0+t1)/2},u:u0,v:v0,len:a1-a0,th:t1-t0};
   }
   if(isSel&&!conn) P.forEach(q=>marks.appendChild(svg('line',{x1:b.p.x,y1:b.p.y,x2:q.x,y2:q.y,stroke:'#fff',
     'stroke-width':1,opacity:.5})));                      /* leads to the body box — only while selected */
   const room=conn?220:(Number.isFinite(depth)?depth/2-pl/2-6:120);
   const ref=true;   /* schematic-style readable text (textAng) */
+  const dep=[];   /* how deep each pin's inside label goes into the body, px */
   c.pads.forEach((pd,i)=>{ const q=P[i], u=U[i], nv=N[i], nc=pd.net&&nets.find(x=>x.id===pd.net), hot=nc&&hlNet===nc.id;
     const st=nc?nc.color:(isSel?'#fff':col), sw=hot?2.4:(isSel?1.8:1.3), f1=i===0?'rgba(255,255,255,.22)':'none';   /* pin 1 tinted */
     let pe;
     if(round) pe=svg('circle',{cx:q.x,cy:q.y,r:rr,fill:f1,stroke:st,'stroke-width':sw});
     else{ const cn=[[1,1],[1,-1],[-1,-1],[-1,1]].map(([a,e])=>(q.x+u.x*pw/2*a+nv.x*pl/2*e)+','+(q.y+u.y*pw/2*a+nv.y*pl/2*e));
       pe=svg('polygon',{points:cn.join(' '),fill:f1,stroke:st,'stroke-width':sw}); }
-    if(hot){ pe.setAttribute('data-hot',''); pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity','.6'); }   /* focused NET: filled pads */
+    if(nc){ pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity',hot?'.6':'.4'); }   /* NET colour tint; focused NET — stronger */
+    if(hot) pe.setAttribute('data-hot','');
     marks.appendChild(pe);
     const fd=Math.min(40,(round?2*rr:pw)*.6);   /* text height: 60% of the pad width */
     if(fd>=4.5){ const ta=textAng(nv).ang;   /* the number turns with the part too */
@@ -153,6 +157,7 @@ function drawIC(c,col,isSel){
       t.textContent=String(pinNo(c,i)); if(hot) t.setAttribute('data-hot',''); marks.appendChild(t); }   /* pin number inside the pad */
     const lab=(str,dir,fill,halo,fit)=>{ if(!str) return;   /* dir 1: label side (connector) / into the body (IC); -1: the other side */
       const fs=c.fs&&conn?c.fs:Math.min(fd,fit?room/(str.length*.62):fd); if(fs<4.5) return;
+      if(dir===1&&!conn) dep[i]=Math.max(dep[i]||0,half+3+str.length*fs*.62);
       const d={x:nv.x*dir,y:nv.y*dir}; dirText({x:q.x+d.x*(half+3),y:q.y+d.y*(half+3)},d,str,fs,fill,halo,hot,ref); };
     const nm=(pd.name||'').trim();
     lab(nm,1,'#f2f2f2','rgba(0,0,0,.85)',!conn);                    /* pin name: the label side / inside the body */
@@ -162,8 +167,24 @@ function drawIC(c,col,isSel){
     stroke:isSel?'#fff':col,'stroke-width':isSel?2:1.3,...(isSel?{'stroke-dasharray':'5 3'}:{})}));
   const t=svg('text',{x:b.p.x,y:b.p.y+.5,fill:isSel?'#fff':col,'font-size':12,'font-weight':600,'text-anchor':'middle',
     'dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'}); t.textContent=c.des; marks.appendChild(t);
-  if(c.val){ const v=svg('text',{x:b.p.x,y:b.p.y+b.h/2+9,fill:isSel?'#fff':col,'font-size':10,'text-anchor':'middle',
-    'font-family':'IBM Plex Mono, monospace',stroke:'rgba(0,0,0,.7)','stroke-width':3,'paint-order':'stroke'});
+  if(c.val){   /* value: along the rows (as under a schematic symbol), in the body's free band between the pin names,
+                 beside the designator box; too tight — under the box as before */
+    let x=b.p.x, y=b.p.y+b.h/2+10, fs=12, ang=0;
+    if(body){ const {u,v}=body; let vLo=-body.th/2, vHi=body.th/2, uLo=-body.len/2, uHi=body.len/2;
+      dep.forEach((d,i)=>{ if(!d) return; const n=N[i], dv=n.x*v.x+n.y*v.y, du=n.x*u.x+n.y*u.y, e=d-(half);   /* depth past the body edge */
+        if(dv>.7) vLo=Math.max(vLo,-body.th/2+e); else if(dv<-.7) vHi=Math.min(vHi,body.th/2-e);
+        else if(du>.7) uLo=Math.max(uLo,-body.len/2+e); else if(du<-.7) uHi=Math.min(uHi,body.len/2-e); });
+      const bo={x:b.p.x-body.o.x,y:b.p.y-body.o.y}, dv0=bo.x*v.x+bo.y*v.y, ex=(b.w*Math.abs(v.x)+b.h*Math.abs(v.y))/2+2;
+      let R, vc;
+      if(dv0-ex>=vHi||dv0+ex<=vLo){ R=vHi-vLo; vc=null; }   /* the box is not in the band */
+      else { const ra=vHi-(dv0+ex), rb=(dv0-ex)-vLo; R=Math.max(ra,rb); vc=ra>=rb?1:-1; }
+      const f=Math.min(40,(uHi-uLo)*.9/(c.val.length*.62),R*.85);
+      if(f>=7){ fs=f; ang=textAng(u).ang;
+        const vp=vc===null?(vLo+vHi)/2:dv0+vc*(ex+fs/2+1), up=(uLo+uHi)/2;
+        x=body.o.x+u.x*up+v.x*vp; y=body.o.y+u.y*up+v.y*vp; } }
+    const v=svg('text',{x,y,fill:'#f2f2f2','font-size':fs.toFixed(2),'font-weight':600,'text-anchor':'middle','dominant-baseline':'central',
+      'font-family':'IBM Plex Mono, monospace',stroke:'rgba(0,0,0,.75)','stroke-width':Math.max(2.5,fs*.22),'paint-order':'stroke',
+      transform:`rotate(${ang.toFixed(2)} ${x} ${y})`});
     v.textContent=c.val; marks.appendChild(v); }
 }
 /* pads of visible parts that carry a NET: [{c, net, has(w,q), zone(w,q)}] (w world, q screen). has — inside the drawn
@@ -199,7 +220,8 @@ function drawSOT(c,col,isSel){
     ...(c.side==='bot'?{'stroke-dasharray':'4 3'}:{})}));
   c.pads.forEach((pd,i)=>{ const q=rect(pd,SOT23.pw/2*k,SOT23.ph/2*k), nc=pd.net&&nets.find(n=>n.id===pd.net), hot=nc&&hlNet===nc.id;
     const pe=svg('polygon',{points:pts(q),fill:'none',stroke:nc?nc.color:(isSel?'#fff':col),'stroke-width':hot?2.4:(isSel?1.8:1.3)});
-    if(hot){ pe.setAttribute('data-hot',''); pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity','.6'); }
+    if(nc){ pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity',hot?'.6':'.4'); }
+    if(hot) pe.setAttribute('data-hot','');
     marks.appendChild(pe);
     const xs=q.map(p=>p.x), ys=q.map(p=>p.y), bw=Math.max(...xs)-Math.min(...xs), bh=Math.max(...ys)-Math.min(...ys);
     if(Math.min(bw,bh)<5) return;

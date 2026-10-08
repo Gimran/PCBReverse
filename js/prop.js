@@ -116,7 +116,8 @@ function drawComps(){
       const hot=nc&&hlNet===nc.id;
       const pe=poly(g[k], 'none', nc?nc.color:(isSel?'#fff':col),
            hot?2.4:(isSel?1.8:1.3), null, hot?1:.9);   /* transparent pad, NET colour outline */
-      if(hot){ pe.setAttribute('data-hot',''); pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity','.6'); }   /* focused NET: filled pads */
+      if(nc){ pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity',hot?'.6':'.4'); }   /* NET colour tint; focused NET — stronger */
+      if(hot) pe.setAttribute('data-hot','');
     });
     /* pin numbers — centred on pads, skipped when the part is too small on screen */
     [['p1','1',c.n1],['p2','2',c.n2]].forEach(([k,num,net])=>{
