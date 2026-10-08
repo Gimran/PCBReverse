@@ -108,7 +108,7 @@ function icGeom(c){
   if(c.pat==='s3') pitch/=2;
   if(!Number.isFinite(pitch)) pitch=20;
   /* pad size on screen follows the pitch and the body size */
-  const round=conn&&c.ps!=='rect';
+  const round=conn&&c.ps==='round';   /* connector pads: rectangular unless set round in PROP */
   const pw=conn?pitch*.7:Math.max(4,pitch*.55);
   const sot=!!SOTN[c.pat];   /* SOT: long pads, half the row distance */
   const pl=conn?pitch*1.1:sot&&Number.isFinite(depth)?depth*.45:Math.max(6,Math.min(pitch*1.5,(Number.isFinite(depth)?depth:pitch*6)*.28));
@@ -136,13 +136,17 @@ function drawIC(c,col,isSel){
       pe=svg('polygon',{points:cn.join(' '),fill:f1,stroke:st,'stroke-width':sw}); }
     if(hot){ pe.setAttribute('data-hot',''); pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity','.6'); }   /* focused NET: filled pads */
     marks.appendChild(pe);
-    if(nc&&nc.name){ const fd=Math.min(40,(round?2*rr:pw)*.6);   /* default label height: 60% of the pad width */
-      const fs=conn?(c.fs||fd):Math.min(fd,room/(nc.name.length*.62));   /* connector: free space beside the row, font from PROP */
-      if(fs>=4.5) dirText({x:q.x+nv.x*(half+3),y:q.y+nv.y*(half+3)},nv,nc.name,fs,nc.color,haloFor(nc.color),hot); }
-    if(pitch>13||isSel){ const o=half+7;
-      const t=svg('text',{x:q.x-nv.x*o,y:q.y-nv.y*o,fill:'#fff',stroke:'#000','stroke-width':2.5,'paint-order':'stroke',
-        'font-size':9.5,'font-weight':600,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'});
-      t.textContent=String(pinNo(c,i)); marks.appendChild(t); } });
+    const fd=Math.min(40,(round?2*rr:pw)*.6);   /* text height: 60% of the pad width */
+    if(fd>=4.5){ const t=svg('text',{x:q.x,y:q.y,fill:'#fff',stroke:'#000','stroke-width':Math.max(1.5,fd*.28),'paint-order':'stroke',
+        'font-size':fd.toFixed(2),'font-weight':600,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'});
+      t.textContent=String(pinNo(c,i)); if(hot) t.setAttribute('data-hot',''); marks.appendChild(t); }   /* pin number inside the pad */
+    const lab=(str,dir,fill,halo,fit)=>{ if(!str) return;   /* dir 1: label side (connector) / into the body (IC); -1: the other side */
+      const fs=c.fs&&conn?c.fs:Math.min(fd,fit?room/(str.length*.62):fd); if(fs<4.5) return;
+      const d={x:nv.x*dir,y:nv.y*dir}; dirText({x:q.x+d.x*(half+3),y:q.y+d.y*(half+3)},d,str,fs,fill,halo,hot); };
+    const nm=(pd.name||'').trim();
+    lab(nm,1,'#f2f2f2','rgba(0,0,0,.85)',!conn);                    /* pin name: the label side / inside the body */
+    if(nc&&nc.name) lab(nc.name,nm?-1:1,nc.color,haloFor(nc.color),!conn&&!nm);   /* NET: opposite the name, else in its place */
+  });
   marks.appendChild(svg('rect',{x:b.p.x-b.w/2,y:b.p.y-b.h/2,width:b.w,height:b.h,rx:3,fill:'rgba(10,14,12,.78)',
     stroke:isSel?'#fff':col,'stroke-width':isSel?2:1.3,...(isSel?{'stroke-dasharray':'5 3'}:{})}));
   const t=svg('text',{x:b.p.x,y:b.p.y+.5,fill:isSel?'#fff':col,'font-size':12,'font-weight':600,'text-anchor':'middle',
@@ -215,12 +219,14 @@ function drawICCursor(){ /* pictogram at the cursor: part outline, pin stubs, pi
   const st=5, k=3;
   if(sot){ const xs=[-hw+4,0,hw-4], bot=icPat==='s3'?[xs[0],xs[2]]:xs, top=icPat==='s3'?[0]:icPat==='s5'?[xs[0],xs[2]]:xs;
     bot.forEach(x=>line({x,y:hh},{x,y:hh+st})); top.forEach(x=>line({x,y:-hh},{x,y:-hh-st})); }
-  else if(icPat==='l1') for(let i=0;i<5;i++){ const x=-hw+4+i*(2*hw-8)/4; line({x,y:-hh},{x,y:-hh-st}); line({x,y:hh},{x,y:hh+st}); }
+  else if(icPat==='l1') for(let i=0;i<5;i++){ const x=-hw+5+i*(2*hw-10)/4;   /* connector: one row of pads */
+    add(svg('polygon',{points:[[-3,-3.5],[3,-3.5],[3,3.5],[-3,3.5]].map(([u,v])=>{ const q=P({x:x+u,y:v}); return q.x+','+q.y; }).join(' '),
+      fill:i===0?'#e8b04b':'none',stroke:'#e8b04b','stroke-width':1.2})); }
   else for(let i=0;i<k;i++){ const t=(i+1)/(k+1);
     const y=-hh+2*hh*t; line({x:-hw,y},{x:-hw-st,y}); line({x:hw,y},{x:hw+st,y});
     if(icPat==='q4'){ const x=-hw+2*hw*t; line({x,y:-hh},{x,y:-hh-st}); line({x,y:hh},{x,y:hh+st}); } }
-  const p1=P(sot?{x:-hw+4,y:hh-3.5}:icPat==='l1'?{x:-hw+4,y:0}:{x:-hw+4.5,y:-hh+4.5});
-  add(svg('circle',{cx:p1.x,cy:p1.y,r:2.6,fill:'#e8b04b'}));
+  if(icPat!=='l1'){ const p1=P(sot?{x:-hw+4,y:hh-3.5}:{x:-hw+4.5,y:-hh+4.5});   /* connector: pin 1 is the filled pad */
+    add(svg('circle',{cx:p1.x,cy:p1.y,r:2.6,fill:'#e8b04b'})); }
   marks.appendChild(g);
 }
 function hitICPad(e){ /* screen-space pick of an IC pad -> {c,i} */

@@ -274,9 +274,10 @@ function renderPropsComp(){
       const opt=(pairs,v,on)=>{ const x=document.createElement('select'); x.className='slim';
         pairs.forEach(([k,t])=>{ const o=document.createElement('option'); o.value=k; o.textContent=t; x.appendChild(o); });
         x.value=v; x.onchange=()=>{ on(x.value); drawMarks(); save(); }; return x; };
-      mkRow(L('пады','pads'),opt([['round',L('круглые','round')],['rect',L('прямоугольные','rectangular')]],c.ps||'round',v=>c.ps=v));
+      mkRow(L('пады','pads'),opt([['rect',L('прямоугольные','rectangular')],['round',L('круглые','round')]],c.ps==='round'?'round':'rect',v=>c.ps=v));
       const ls=opt([['r',L('справа','right')],['l',L('слева','left')]],c.ls||'r',v=>c.ls=v);
-      ls.title=L('сторона подписей NET от ряда; у горизонтального ряда «справа» = снизу','NET label side of the row; for a horizontal row “right” = below');
+      ls.title=L('сторона названий выводов (NET — с другой стороны; без названия NET здесь); у горизонтального ряда «справа» = снизу',
+                 'side of the pin names (NET on the other side; without a name the NET goes here); for a horizontal row “right” = below');
       mkRow(L('подписи','labels'),ls);
       const fz=document.createElement('input'); fz.type='text'; fz.className='num'; fz.value=c.fs||''; fz.placeholder=L('авто','auto');
       fz.title=L('размер шрифта подписей NET, px экрана; пусто — 60% ширины пада','NET label font size, screen px; empty — 60% of the pad width');
@@ -286,13 +287,17 @@ function renderPropsComp(){
     const sd=document.createElement('select'); sd.className='slim';
     [['top','top-comp'],['bot','bot-comp']].forEach(([v,t])=>{const o=document.createElement('option'); o.value=v;o.textContent=t;sd.appendChild(o)});
     sd.value=c.side; sd.onchange=()=>{c.side=sd.value;renderComps();drawMarks();save()}; mkRow(L('сторона','side'),sd);
-    const pl=document.createElement('div'); pl.style.cssText='display:grid;grid-template-columns:auto 1fr;gap:3px 6px;max-height:240px;overflow:auto;align-items:center';
+    const pl=document.createElement('div'); pl.style.cssText='display:grid;grid-template-columns:auto 1fr 1fr;gap:3px 6px;max-height:280px;overflow:auto;align-items:center';
     c.pads.forEach((pd,i)=>{ const n=document.createElement('span'); n.className='lbl'; n.style.textAlign='right'; n.textContent=String(pinNo(c,i));
+      const pn=document.createElement('input'); pn.type='text'; pn.value=pd.name||''; pn.placeholder=L('название','name'); pn.spellcheck=false;
+      pn.title=L('название вывода (VCC, 1A, OE…)','pin name (VCC, 1A, OE…)');
+      pn.oninput=()=>{ const v=pn.value.trim(); if(v) pd.name=v; else delete pd.name; drawMarks(); save(); };
+      pn.onkeydown=e=>{ if(e.key==='Enter'||e.key==='Escape') pn.blur(); };
       const s2=document.createElement('select'); s2.className='slim';
       const o0=document.createElement('option'); o0.value=''; o0.textContent='—'; s2.appendChild(o0);
       nets.forEach(nt=>{const o=document.createElement('option');o.value=nt.id;o.textContent=nt.name;s2.appendChild(o)});
-      s2.value=pd.net||''; s2.onchange=()=>{pd.net=s2.value||null;drawMarks();save()}; pl.append(n,s2); });
-    const ph=document.createElement('div'); ph.className='lbl'; ph.textContent=L('выводы → NET','pins → NET'); box.append(ph,pl);
+      s2.value=pd.net||''; s2.onchange=()=>{pd.net=s2.value||null;drawMarks();save()}; pl.append(n,pn,s2); });
+    const ph=document.createElement('div'); ph.className='lbl'; ph.textContent=L('вывод · название · NET','pin · name · NET'); box.append(ph,pl);
     const del=document.createElement('button'); del.className='mini wide'; del.textContent=L('Удалить компонент','Delete component');
     del.onclick=()=>{comps=comps.filter(o=>o.id!==c.id);selComp=null;renderComps();drawMarks();save()};
     box.appendChild(del);
