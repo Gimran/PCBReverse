@@ -17,7 +17,12 @@ const STATE = FILE ? path.resolve(FILE) : path.join(__dirname, 'test_project.pcb
 const PCBR = /\.pcbr$/i.test(STATE);
 
 (async () => {
-  const b = await chromium.launch(HEADED ? { headless: false, slowMo: SLOW } : {});
+  /* headed: the installed Chrome / Edge (Playwright's own full Chromium does not start on this PC — spawn UNKNOWN) */
+  const launch = async () => { if (!HEADED) return chromium.launch();
+    for (const channel of ['chrome', 'msedge', undefined])
+      try { return await chromium.launch({ headless: false, slowMo: SLOW, ...(channel ? { channel } : {}) }); } catch (e) {}
+    throw new Error('no browser to show the test in'); };
+  const b = await launch();
   const ctx = await b.newContext({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
   if (TRACE) await ctx.tracing.start({ screenshots: true, snapshots: true });
   const p = await ctx.newPage();

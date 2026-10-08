@@ -24,7 +24,7 @@ SMD-компонентов. Выросло из проекта GN1144 (SFP+ 10G)
 | `pcb_overlay_state.json` | старое рабочее состояние (JSON, не в git) |
 | `backups/` | предыдущие версии страницы |
 | `package.json` | только dev-зависимость playwright (приложению сборка не нужна), `node_modules/` в .gitignore |
-| `tests/smoke.js` | Playwright-смоук: `node tests/smoke.js [project.pcbr]` (по умолчанию `tests/test_project.pcbr`) |
+| `tests/smoke.js` | Playwright-смоук: `node tests/smoke.js [project.pcbr]` (по умолчанию `tests/test_project.pcbr`); `npm run smoke:show` — в видимом окне установленного Chrome/Edge, замедленно (`--slow=ms`); `npm run smoke:trace` — трасса в `tests/out/` (в .gitignore), смотреть `npx playwright show-trace tests/out/smoke-trace.zip`. Полный Chromium Playwright на этом ПК не стартует (spawn UNKNOWN) — видимый режим идёт через `channel:'chrome'` |
 | `README.md` / `README.ru.md` | README английский (основной) / русский, ссылки друг на друга вверху |
 | `docs/*_en.jpg`, `docs/*.jpg` | скриншоты для README EN / RU; пересъёмка: `python -m http.server 8765` + `node tests/shots.mjs docs` (headless Chrome по CDP) |
 
