@@ -80,9 +80,17 @@ function icSides(c){ const n=c.pads.length, ix=(a,b)=>Array.from({length:b-a},(_
   const h=Math.ceil(n/2); return [ix(0,h),ix(h,n)].filter(g=>g.length);
 }
 /* label text along direction nv from point q: never upside down */
-function dirText(q,nv,str,fs,fill,halo,hot){
+/* readable text along a pin, as on a schematic symbol: the angle is brought into [-90°, 90°) — horizontal text reads
+   left-to-right, vertical bottom-to-top (opposite rows read the same way and turn together with the part);
+   anchor at the pin: 'start' if the text runs along nv, else 'end' */
+function textAng(nv){
+  const a=Math.atan2(nv.y,nv.x)*180/Math.PI; let ang=((a+90)%180+180)%180-90; if(ang>=90-1e-6) ang-=180;
+  return {ang, anchor:Math.cos((ang-a)*Math.PI/180)>0?'start':'end'};
+}
+function dirText(q,nv,str,fs,fill,halo,hot,ref){
   let ang=Math.atan2(nv.y,nv.x)*180/Math.PI, anchor='start';
-  if(ang>90||ang<=-90){ ang+=180; anchor='end'; }
+  if(ref) ({ang,anchor}=textAng(nv));
+  else if(ang>90||ang<=-90){ ang+=180; anchor='end'; }
   const t=svg('text',{x:q.x,y:q.y,fill,stroke:halo,'stroke-width':Math.max(1.4,fs*.34),'paint-order':'stroke',
     'font-size':fs.toFixed(2),'font-weight':500,'text-anchor':anchor,'dominant-baseline':'central',
     'font-family':'IBM Plex Mono, monospace',transform:`rotate(${ang.toFixed(2)} ${q.x} ${q.y})`});
@@ -128,6 +136,7 @@ function drawIC(c,col,isSel){
   if(isSel&&!conn) P.forEach(q=>marks.appendChild(svg('line',{x1:b.p.x,y1:b.p.y,x2:q.x,y2:q.y,stroke:'#fff',
     'stroke-width':1,opacity:.5})));                      /* leads to the body box — only while selected */
   const room=conn?220:(Number.isFinite(depth)?depth/2-pl/2-6:120);
+  const ref=true;   /* schematic-style readable text (textAng) */
   c.pads.forEach((pd,i)=>{ const q=P[i], u=U[i], nv=N[i], nc=pd.net&&nets.find(x=>x.id===pd.net), hot=nc&&hlNet===nc.id;
     const st=nc?nc.color:(isSel?'#fff':col), sw=hot?2.4:(isSel?1.8:1.3), f1=i===0?'rgba(255,255,255,.22)':'none';   /* pin 1 tinted */
     let pe;
@@ -137,12 +146,14 @@ function drawIC(c,col,isSel){
     if(hot){ pe.setAttribute('data-hot',''); pe.setAttribute('fill',nc.color); pe.setAttribute('fill-opacity','.6'); }   /* focused NET: filled pads */
     marks.appendChild(pe);
     const fd=Math.min(40,(round?2*rr:pw)*.6);   /* text height: 60% of the pad width */
-    if(fd>=4.5){ const t=svg('text',{x:q.x,y:q.y,fill:'#fff',stroke:'#000','stroke-width':Math.max(1.5,fd*.28),'paint-order':'stroke',
-        'font-size':fd.toFixed(2),'font-weight':600,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace'});
+    if(fd>=4.5){ const ta=textAng(nv).ang;   /* the number turns with the part too */
+      const t=svg('text',{x:q.x,y:q.y,fill:'#fff',stroke:'#000','stroke-width':Math.max(1.5,fd*.28),'paint-order':'stroke',
+        'font-size':fd.toFixed(2),'font-weight':600,'text-anchor':'middle','dominant-baseline':'central','font-family':'IBM Plex Mono, monospace',
+        transform:`rotate(${ta.toFixed(2)} ${q.x} ${q.y})`});
       t.textContent=String(pinNo(c,i)); if(hot) t.setAttribute('data-hot',''); marks.appendChild(t); }   /* pin number inside the pad */
     const lab=(str,dir,fill,halo,fit)=>{ if(!str) return;   /* dir 1: label side (connector) / into the body (IC); -1: the other side */
       const fs=c.fs&&conn?c.fs:Math.min(fd,fit?room/(str.length*.62):fd); if(fs<4.5) return;
-      const d={x:nv.x*dir,y:nv.y*dir}; dirText({x:q.x+d.x*(half+3),y:q.y+d.y*(half+3)},d,str,fs,fill,halo,hot); };
+      const d={x:nv.x*dir,y:nv.y*dir}; dirText({x:q.x+d.x*(half+3),y:q.y+d.y*(half+3)},d,str,fs,fill,halo,hot,ref); };
     const nm=(pd.name||'').trim();
     lab(nm,1,'#f2f2f2','rgba(0,0,0,.85)',!conn);                    /* pin name: the label side / inside the body */
     if(nc&&nc.name) lab(nc.name,nm?-1:1,nc.color,haloFor(nc.color),!conn&&!nm);   /* NET: opposite the name, else in its place */
