@@ -127,6 +127,23 @@ function svg(tag,attrs){const n=document.createElementNS(SVGNS,tag);
 function haloFor(col){ const m=/^#?([0-9a-f]{6})$/i.exec(col||''); if(!m) return 'rgba(0,0,0,.78)';
   const n=parseInt(m[1],16), y=(.299*(n>>16)+.587*(n>>8&255)+.114*(n&255))/255;
   return y<.4?'rgba(255,255,255,.85)':'rgba(0,0,0,.78)'; }
+/* A single open NET chain, independent of which point is selected and of view rotation/mirroring.
+   Start at an outer point, then visit the nearest unvisited point in world coordinates. */
+function netChain(P){
+  if(P.length<2) return P.slice();
+  const dist=(a,b)=>(a.w.x-b.w.x)**2+(a.w.y-b.w.y)**2;
+  const centre={w:{x:P.reduce((s,p)=>s+p.w.x,0)/P.length,y:P.reduce((s,p)=>s+p.w.y,0)/P.length}};
+  const left=P.slice();
+  let i=0;
+  for(let j=1;j<left.length;j++) if(dist(left[j],centre)>dist(left[i],centre)) i=j;
+  const chain=[left.splice(i,1)[0]];
+  while(left.length){
+    const last=chain[chain.length-1]; i=0;
+    for(let j=1;j<left.length;j++) if(dist(last,left[j])<dist(last,left[i])) i=j;
+    chain.push(left.splice(i,1)[0]);
+  }
+  return chain;
+}
 function drawMarks(){
   while(marks.firstChild) marks.removeChild(marks.firstChild);
   const ring=(p,col,r,wd,op)=>marks.appendChild(svg('circle',{cx:p.x,cy:p.y,r:r,fill:'none',
@@ -153,14 +170,13 @@ function drawMarks(){
   $('stack').classList.toggle('gray',grayView||!!(fNet&&showNets));
   const grey=n0=>{ for(let i=n0;i<marks.children.length;i++){ const e=marks.children[i];
     if(!e.hasAttribute('data-hot')) e.style.filter='grayscale(1)'; } };
-  if(showNets&&fNet){   /* star: from the selected point (else the one nearest the centre) to every other point */
-    const P=points.filter(pt=>pt.net===fNet.id&&byId(pt.layer)).map(pt=>({pt,q:screenOf(worldOf(byId(pt.layer),pt.p))}));
-    let c=P.find(o=>o.pt.id===selPoint);
-    if(!c&&P.length){ const mx=P.reduce((a,o)=>a+o.q.x,0)/P.length, my=P.reduce((a,o)=>a+o.q.y,0)/P.length;
-      c=P.reduce((b,o)=>Math.hypot(o.q.x-mx,o.q.y-my)<Math.hypot(b.q.x-mx,b.q.y-my)?o:b); }
-    if(c) P.forEach(o=>{ if(o===c) return;
+  if(showNets&&fNet){   /* one open chain: each point has at most two neighbours */
+    const P=netChain(points.filter(pt=>pt.net===fNet.id&&byId(pt.layer)).map(pt=>{
+      const w=worldOf(byId(pt.layer),pt.p); return {pt,w,q:screenOf(w)};
+    }));
+    P.forEach((o,i)=>{ if(!i) return; const c=P[i-1];
       marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:haloFor(fNet.color),'stroke-width':3.5,opacity:.45}));
-      marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:fNet.color,'stroke-width':1.5,opacity:.9})); });
+      marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:fNet.color,'stroke-width':1.5,opacity:.9,'data-net-chain':''})); });
   }
   const cov=showNets&&clickMode!=='net'?padCover():[];
   if(showNets) points.forEach(pt=>{
