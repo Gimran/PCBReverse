@@ -144,6 +144,22 @@ function netChain(P){
   }
   return chain;
 }
+/* Side chains share only vias. Legacy points on an 'any' layer stay in a separate group. */
+function netChainEdges(P){
+  const side=o=>o.pt.side||byId(o.pt.layer)?.side||'any';
+  const sides=new Set(['top','bot',...P.filter(o=>!o.pt.via).map(side)]);
+  const edges=[], seen=new Set(), index=new Map(P.map((o,i)=>[o,i]));
+  for(const sd of sides){
+    const C=netChain(P.filter(o=>o.pt.via||side(o)===sd));
+    for(let i=1;i<C.length;i++){
+      const a=C[i-1], b=C[i], ai=index.get(a), bi=index.get(b);
+      const key=ai<bi?`${ai}:${bi}`:`${bi}:${ai}`;
+      if(seen.has(key)) continue;
+      seen.add(key); edges.push([a,b]);
+    }
+  }
+  return edges;
+}
 function drawMarks(){
   while(marks.firstChild) marks.removeChild(marks.firstChild);
   const ring=(p,col,r,wd,op)=>marks.appendChild(svg('circle',{cx:p.x,cy:p.y,r:r,fill:'none',
@@ -170,11 +186,11 @@ function drawMarks(){
   $('stack').classList.toggle('gray',grayView||!!(fNet&&showNets));
   const grey=n0=>{ for(let i=n0;i<marks.children.length;i++){ const e=marks.children[i];
     if(!e.hasAttribute('data-hot')) e.style.filter='grayscale(1)'; } };
-  if(showNets&&fNet){   /* one open chain: each point has at most two neighbours */
-    const P=netChain(points.filter(pt=>pt.net===fNet.id&&byId(pt.layer)).map(pt=>{
+  if(showNets&&fNet){   /* separate side chains, joined at through-hole points */
+    const P=points.filter(pt=>pt.net===fNet.id&&byId(pt.layer)).map(pt=>{
       const w=worldOf(byId(pt.layer),pt.p); return {pt,w,q:screenOf(w)};
-    }));
-    P.forEach((o,i)=>{ if(!i) return; const c=P[i-1];
+    });
+    netChainEdges(P).forEach(([c,o])=>{
       marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:haloFor(fNet.color),'stroke-width':3.5,opacity:.45}));
       marks.appendChild(svg('line',{x1:c.q.x,y1:c.q.y,x2:o.q.x,y2:o.q.y,stroke:fNet.color,'stroke-width':1.5,opacity:.9,'data-net-chain':''})); });
   }
